@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+  <TITLE>Site Pings</TITLE>
+  <script src="/js/jquery-3.0.0.min.js"></script>
+  <script src="/js/wikk_ajax-min.js"></script>
+  <script src="/js/wikk_web_auth-min.js"></script>
+  <script src="/js/wikk_params.js"></script>
+  <script src="/js/ping.js"></script>
+  <script src="/js/ping_comms.js"></script>
+  <script src="/js/last_seen_comms.js"></script>
+  <script src="/js/customer_comms.js"></script>
+  <script src="/js/distribution_comms.js"></script>
+  <script src="/js/traffic_comms.js"></script>
+
+  <script type="text/javascript">
+      //Need to add Greys -> ping, Blue -> missed ping, Black line is middle value, Green line is average.
+      var site_name ="none";
+      var graph_type = ['traffic_split', 'ping'];
+      var imageCloseTriangle = new Image();
+      var imageExpandedTriangle = new Image();
+
+      imageCloseTriangle.src = "/images/closedTriangle.gif";
+      imageCloseTriangle.onclick="toggle_form_state();"
+      imageExpandedTriangle.src = "/images/expandedTriangle.gif";
+      imageExpandedTriangle.onclick="toggle_form_state();"
+
+      var working_img = new Image();
+      working_img.src = "/images/chain_waiting_image/chain.gif";
+
+      function toggle_form_state() {
+        var simple_state_div = document.getElementById("simple");
+        var admin_state_div = document.getElementById("extended");
+        var other_sites_span = document.getElementById("other_sites");
+        var image1 = document.getElementById('form_state');
+
+        if(wikk_web_auth.authenticated()) {
+          if(simple_form) {
+            simple_form = false;
+            //simple_state_div.style.display = 'none';
+            admin_state_div.style.display = 'block';
+            other_sites_span.style.display = 'block';
+            image1.src = imageExpandedTriangle.src;
+          } else {
+            simple_form = true;
+            //simple_state_div.style.display = 'block';
+            admin_state_div.style.display = 'none';
+            other_sites_span.style.display = 'none';
+            image1.src = imageCloseTriangle.src;
+          }
+        } else {
+          if(simple_form == false) {
+            simple_form = true;
+            //simple_state_div.style.display = 'block';
+            admin_state_div.style.display = 'none';
+            other_sites_span.style.display = 'none';
+            image1.src = imageCloseTriangle.src;
+          }
+        }
+        return true;
+      }
+
+      function set_site_name(host) {
+        var site_name_h2 = document.getElementById('site_name_h2');
+        window.site_name = host;
+        site_name_h2.innerHTML = host;
+      }
+
+      function local_client_site_list() {
+        var the_select = document.getElementById('site_list_1');
+        if(Array.isArray(window.site_name))
+          the_select.value = window.site_name[0];
+        else
+          the_select.value = window.site_name;
+        get_ping_data();
+      }
+
+      function tower_completion() {
+        var the_select = document.getElementById('site_list_1');
+        for(var o in the_select.options) {
+          the_select.options[o].value = the_select.options[o].text;
+        }
+        add_optgroup_label(the_select, '--- Sites ---')
+
+        wikk_customer.get_site_list( [the_select], local_client_site_list );
+      }
+
+      function add_optgroup_label(list, label) {
+        var optgroup = document.createElement("OPTGROUP");
+        optgroup.label = label
+        optgroup.disabled = true;
+        list.appendChild(optgroup);
+      }
+
+      function switch_customers(the_site_name) {
+        set_site_name(the_site_name);
+        set_now();
+        get_ping_data();
+      }
+
+      function init() {
+        init_start_datetime();
+        delay_sending = false;
+        simple_form = false;
+
+        var params = wikk_params.getURLParameters();
+        var the_graphtype = wikk_params.get_argv('graphtype');
+        if(the_graphtype != null && (gt = graph_type_map[the_graphtype]) != null) {
+          window.graph_type = gt;
+        }
+        var host = wikk_params.get_argv('host');
+        set_site_name(host);
+
+        var start_time = wikk_params.get_argv('start_time');
+        var end_time = wikk_params.get_argv('end_time');
+        var days_arg = wikk_params.get_argv('days');
+        var hours_arg = wikk_params.get_argv('hour');
+        days = days_arg == null ? null : parseFloat(days_arg);
+        hours = hours_arg == null ? null : parseFloat(hours_arg);
+        try {
+            init_start_datetime(start_time, end_time, days, hours);
+        }
+        catch(err) {
+            init_start_datetime();
+        }
+
+        wikk_web_auth.logged_in(true, "/admin/ping.html", "login_span", null)
+
+        var the_select = document.getElementById('site_list_1');
+        add_optgroup_label(the_select, '--- Towers --- ')
+        wikk_distribution.get_site_list( [ the_select ], true, tower_completion );
+      }
+
+  </script>
+  <META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+  <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+</HEAD>
+<BODY onload="init();">
+  <div style="padding-left: 0px">
+    <span id='simple' style="margin-left:0px;display:block;" >
+        <span style="text-align: center; float:left;">
+          <BUTTON type="submit" id="prev_hour" onClick="post_form_offset_hour(-1);this.blur();">  &lt;&lt; </BUTTON>
+          <BUTTON type="submit" id="last_hour" onClick="post_form_last_hour();this.blur();">  Last Hour </BUTTON>
+          <BUTTON type="submit" id="next_hour" onClick="post_form_offset_hour(1);this.blur();">  &gt;&gt; </BUTTON>
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <BUTTON type="submit" id="prev_day" onClick="post_form_offset_day(-1);this.blur();">  &lt;&lt; </BUTTON>
+          <BUTTON type="submit" id="last_day" onClick="post_form_today();this.blur();">  Today </BUTTON>
+          <BUTTON type="submit" id="next_day" onClick="post_form_offset_day(1);this.blur();">  &gt;&gt; </BUTTON>
+          &nbsp;&nbsp;&nbsp;&nbsp;
+        </span>
+
+        <span style="text-align: right; float:right;">
+          <span id="login_span"></span> &nbsp;
+          <img id='form_state' src="/images/closedTriangle.gif"  onclick="toggle_form_state();" /> &nbsp; <span id="datetime">0000-00-00 00:00:00</span>
+          <br>
+          <span id='other_sites' style="display:none;">
+            <select id='site_list_1' onchange="switch_customers(this.value);"> </select>
+          </span>
+        </span>
+    </span> <br>
+    <span id='extended' style="margin-left:0px;display:none;" >
+        <p><span style="margin-left:0px; text-align:left; float:left;">
+          <form id='expanded_form' onSubmit="return false;">
+            Start <input type="text" id="start_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            End Date-time <input type="text" id="end_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            <input type="checkbox" id="delayed" value="delayed" onClick="set_delayed(this)"> Delay
+            <BUTTON type="submit" id="last_seen" onClick="set_last_seen();this.blur();">Last Seen</BUTTON>
+            <BUTTON type="submit" id="last_traffic" onClick="set_last_traffic();this.blur();">Last Traffic</BUTTON>
+            <br>
+            Days <input type="text" name="days" value="0" id="days" size="5">
+            Hours <input type="text" name="hours" value="1.0" id="hours" size="4">
+            <BUTTON type="submit" id="set_endtime" onClick="post_form_offset_period(0);this.blur();return false">Set Endtime</BUTTON>
+            &nbsp;&nbsp;
+            <BUTTON type="submit" id="prev_period" onClick="post_form_offset_period(-1);this.blur();return false"> &lt;&lt; </BUTTON>
+            <BUTTON type="submit" id="endnow" onClick="post_form_last_period();this.blur();return false">Now - Period</BUTTON>
+            <BUTTON type="submit" id="next_period" onClick="post_form_offset_period(1);this.blur();return false"> &gt;&gt; </BUTTON>
+            &nbsp;&nbsp;
+            <BUTTON type="submit" id="prev_month" onClick="post_form_month(-1);this.blur();return false"> &lt;&lt; </BUTTON>
+            <BUTTON type="submit" id="thismonth" onClick="post_form_month(0);this.blur();return false"> This Month </BUTTON>
+            <BUTTON type="submit" id="next_month" onClick="post_form_month(1);this.blur();return false"> &gt;&gt; </BUTTON>
+          </form>
+          <br>
+          <BUTTON type="submit" id="pings_and_traffic" onClick="post_form(this.id);this.blur();return false"> Pings and Traffic </BUTTON>
+          <BUTTON type="submit" id="pings" onClick="post_form(this.id);this.blur();return false"> Just Pings </BUTTON>
+          <BUTTON type="submit" id="traffic" onClick="post_form(this.id);this.blur();return false"> Just Traffic </BUTTON>
+          <BUTTON type="submit" id="host_histogram" onClick="post_form(this.id);this.blur();return false"> Ext-Host Histogram </BUTTON>
+          <BUTTON type="submit" id="internal_hosts" onClick="post_form(this.id);this.blur();return false"> Internal Hosts </BUTTON>
+          <BUTTON type="submit" id="port_histogram" onClick="post_form(this.id);this.blur();return false"> Port Histogram </BUTTON>
+          <BUTTON type="submit" id="usage" onClick="post_form(this.id);this.blur();return false"> Usage </BUTTON>
+        </span> </p>
+    </span>
+  </div>
+  <H2 id='site_name_h2'></H2>
+  <div id='result_div'></div>
+</BODY>
+</HTML>
