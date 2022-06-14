@@ -1,0 +1,97 @@
+<html>
+  <head>
+    <title>Host Pinger</title>
+    <script src="/js/jquery-3.0.0.min.js"></script>
+    <script src="/js/wikk_ajax-min.js"></script>
+    <script src="/js/wikk_web_auth-min.js"></script>
+    <script src="/js/wikk_params.js"></script>
+    <script src="/js/customer_comms.js"></script>
+    <script src="/js/distribution_comms.js"></script>
+    <script src="/js/backbone_comms.js"></script>
+    <script src="/js/host_ping_comms.js"></script>
+    <script>
+    var site_name = "";
+
+    function add_optgroup_label(list, label) {
+      var optgroup = document.createElement("OPTGROUP");
+      optgroup.label = label
+      optgroup.disabled = true;
+      list.appendChild(optgroup);
+    }
+
+    function local_client_site_list() {
+      var the_select = document.getElementById('site_list_1');
+
+      if(Array.isArray(window.site_name))
+        the_select.value = window.site_name[0];
+      else
+        the_select.value = window.site_name;
+
+      wikk_host_ping.get_host_ping(window.site_name, ping_completion, 0);
+    }
+
+    function local_backbone_site_list(site_list, select_id_array) {
+      console.log('backbone_completion:site_list ' + site_list.length)
+      for(var s in select_id_array) { // Each select menu on the page
+        for(var o in select_id_array[s].options) {
+          select_id_array[s].options[o].value = select_id_array[s].options[o].text; //Use the site_name as the key.
+        }
+        add_optgroup_label(select_id_array[s], '--- Sites ---')
+      }
+      wikk_customer.get_site_list( select_id_array, local_client_site_list ); //now get the customer sites
+    }
+
+    function tower_completion() {
+      var the_select = document.getElementById('site_list_1');
+      for(var o in the_select.options) {
+        the_select.options[o].value = the_select.options[o].text;
+      }
+      add_optgroup_label(the_select, '--- backbone ---')
+
+      wikk_backbone.get_site_list( [ the_select ], true, local_backbone_site_list );
+    }
+
+    function ping_completion(data) {
+      var the_cell = document.getElementById('ping_cell');
+      var the_cell_span = document.getElementById('ping_cell_span');
+      if(data != null && data.hostname == window.site_name) {
+        the_cell_span.innerHTML = data.ms;
+        if(data.ms == '-')
+          the_cell.style.backgroundColor =  "red";
+        else
+          the_cell.style.backgroundColor =  "green";
+        wikk_host_ping.get_host_ping(window.site_name, ping_completion, 3000);
+      } else {
+        the_cell_span.innerHTML = '-';
+        the_cell.style.backgroundColor =  "red";
+      }
+    }
+
+    function switch_customers(the_site_name) {
+      window.site_name = the_site_name;
+      wikk_host_ping.get_host_ping(site_name, ping_completion, 0);
+    }
+
+    function init() {
+      var params = wikk_params.getURLParameters();
+      var host = wikk_params.get_argv('host');
+      if(host != null) window.site_name = host;
+
+      wikk_web_auth.logged_in(true, "/admin/host_ping.html", "login_span", null)
+
+      var the_select = document.getElementById('site_list_1');
+      add_optgroup_label(the_select, '--- Towers --- ')
+      wikk_distribution.get_site_list( [ the_select ], true, tower_completion );
+    }
+    </script>
+  </head>
+  <body onload="init()">
+    <span id="login_span"></span><br>
+    <span id='sites'>
+      <select id='site_list_1' onchange="switch_customers(this.value);"> </select>
+    </span><br>
+    <table border="1" width="200px" height="100px">
+      <tr><th id='ping_cell'><font size="80">&nbsp;<span id='ping_cell_span'>&nbsp;</span></font>&nbsp;</th></tr>
+    </table>
+  </body>
+</html>

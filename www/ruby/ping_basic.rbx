@@ -6,7 +6,7 @@ require 'wikk_configuration'
 RLIB = '../../../rlib/'
 require "#{RLIB}/wikk_conf.rb"
 require "#{RLIB}/monitor/lastseen_sql.rb"
-require "#{RLIB}/monitor/ping_log.rb"
+require "#{RLIB}/monitor/pinglog.rb"
 require "#{RLIB}/monitor/signal_log_new.rb"
 require "#{RLIB}/account/graph_sql_traffic.rb"
 
@@ -149,7 +149,7 @@ def gen_images
                        Graph_2D.new(@mysql_conf, h, false, Time.at(@start_date_time), Time.at(@end_time) ).images
                      end
         when 'ping'
-          ping_record = Ping_Log.new(@mysql_conf)
+          ping_record = Ping.new(@mysql_conf)
           if (error = ping_record.gnuplot(h, Time.at(@start_date_time), Time.at(@end_time)) ).nil?
             @images << "<p><img src=\"/netstat/#{h}-p5f.png?start_time=#{Time.at(@start_date_time).xmlschema}&end_time=#{Time.at(@end_time).xmlschema}\"></p>\n"
           else
@@ -176,13 +176,13 @@ def gen_images
           end
         when 'pdist'
           @images << Graph_2D.new(@mysql_conf, h, true, Time.at(@start_date_time), Time.at(@end_time)).images
-          ping_record = Ping_Log.new(@mysql_conf)
+          ping_record = Ping.new(@mysql_conf)
           if (error = ping_record.gnuplot(h, Time.at(@start_date_time), Time.at(@end_time)) ).nil?
             @images << "<p><img src=\"/netstat/#{h}-p5f.png?start_time=#{Time.at(@start_date_time).xmlschema}&end_time=#{Time.at(@end_time).xmlschema}\"></p>\n"
           else
             @message << error.to_s
           end
-          @images << Ping_Log.graph_clients(@mysql_conf, h, Time.at(@start_date_time), Time.at(@end_time) )
+          @images << Ping.graph_clients(@mysql_conf, h, Time.at(@start_date_time), Time.at(@end_time) )
         when 'internal_hosts'
           @images << Graph_Internal_Hosts.new( h, Time.at(@start_date_time), Time.at(@end_time)).images
         else # Assume traffic split

@@ -17,13 +17,13 @@ def graph_cluster(cluster_name, hosts, status)
   cluster_node_name = cluster_name.gsub(/\s+/, '\\n')
 
   File.open("#{TMP_PLOT_DIR}/#{filename}.dot", 'w') do |fd|
-    fd.print <<~EOF2
+    fd.print <<~GNUPLOT
       graph #{filename} {
         graph [ fontname = "Times", fontsize=12, dpi=72  ];
         node [shape=ellipse, fontname = "Lucida", fontsize=12];
           \"#{cluster_node_name}\" [color=#{(color = status[cluster_name]) ? color : 'black'}, URL="/admin/ping.html?host=#{filename.downcase.sub('_clients', '')}&traffic=#{filename.downcase.sub('_clients', '')}&#{cluster_hosts_url(hosts)}hour=1&no_traffic=true"];
         node [shape=house, color=black, fontname = "Lucida", fontsize=12];
-    EOF2
+    GNUPLOT
 
     hosts.each { |h| fd.print("\t#{h} [ color=#{(color = status[h]) ? color : 'black'}, URL=\"/admin/ping.html?host=#{h}&hour=1#{status[h] == 'green' ? '' : '&lastseen=true'}\"];\n" ) }
     fd.print "\n"
@@ -43,17 +43,34 @@ end
 
 def text_status(clusters, status, filename)
   File.open(filename, 'w') do |fd|
-    fd.print "<html>\n<head><title>Offline Routers</title></head>\n<body>\n<h1>Offline</h1><span style=\"FONT-FAMILY:Arial ; font-size: 10px; margin-top:0; margin-left:0;\" >#{Time.now}</span><p>\n"
+    fd.print <<~HTML
+      <html>
+      <head><title>Offline Routers</title></head>
+      <body>
+        <h1>Offline</h1>
+          <span style="FONT-FAMILY:Arial ; font-size: 10px; margin-top:0; margin-left:0;" >#{Time.now}</span>
+          <p>
+    HTML
     clusters.each do |cluster_name, hosts|
       next unless (s = status[cluster_name]) != 'green' && s != 'black'
 
-      fd.print "#{cluster_name}\n<ul>"
+      fd.print <<~HTML
+        #{cluster_name}
+        <ul>
+      HTML
       hosts.each do |h|
-        fd.print "\t<li><a href=\"/admin/ping.html?host=#{h}&hour=1&lastseen=true\"><span style=\"color:#{status[h]}\">#{h}</span></a></li>\n" if status[h] != 'green'
+        fd.print <<~HTML if status[h] != 'green'
+          <li><a href=\"/admin/ping.html?host=#{h}&hour=1&lastseen=true\"><span style=\"color:#{status[h]}\">#{h}</span></a></li>
+        HTML
       end
-      fd.print "</ul>\n"
+      fd.print <<~HTML
+        </ul>
+      HTML
     end
-    fd.print "</body>\n</html>\n"
+    fd.print <<~HTML
+      </body>
+      </html>
+    HTML
   end
 end
 

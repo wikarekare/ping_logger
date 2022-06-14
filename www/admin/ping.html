@@ -11,6 +11,7 @@
   <script src="/js/last_seen_comms.js"></script>
   <script src="/js/customer_comms.js"></script>
   <script src="/js/distribution_comms.js"></script>
+  <script src="/js/backbone_comms.js"></script>
   <script src="/js/traffic_comms.js"></script>
 
   <script type="text/javascript">
@@ -75,14 +76,25 @@
         get_ping_data();
       }
 
+      function local_backbone_site_list(site_list, select_id_array) {
+        console.log('backbone_completion:site_list ' + site_list.length)
+        for(var s in select_id_array) { // Each select menu on the page
+          for(var o in select_id_array[s].options) {
+            select_id_array[s].options[o].value = select_id_array[s].options[o].text; //Use the site_name as the key.
+          }
+          add_optgroup_label(select_id_array[s], '--- Sites ---')
+        }
+        wikk_customer.get_site_list( select_id_array, local_client_site_list ); //now get the customer sites
+      }
+
       function tower_completion() {
         var the_select = document.getElementById('site_list_1');
         for(var o in the_select.options) {
           the_select.options[o].value = the_select.options[o].text;
         }
-        add_optgroup_label(the_select, '--- Sites ---')
+        add_optgroup_label(the_select, '--- Backbone ---')
 
-        wikk_customer.get_site_list( [the_select], local_client_site_list );
+        wikk_backbone.get_site_list( [the_select], true, local_backbone_site_list );
       }
 
       function add_optgroup_label(list, label) {
@@ -161,24 +173,26 @@
     <span id='extended' style="margin-left:0px;display:none;" >
         <p><span style="margin-left:0px; text-align:left; float:left;">
           <form id='expanded_form' onSubmit="return false;">
-            Start <input type="text" id="start_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
-            End Date-time <input type="text" id="end_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
-            <input type="checkbox" id="delayed" value="delayed" onClick="set_delayed(this)"> Delay
-            <BUTTON type="submit" id="last_seen" onClick="set_last_seen();this.blur();">Last Seen</BUTTON>
-            <BUTTON type="submit" id="last_traffic" onClick="set_last_traffic();this.blur();">Last Traffic</BUTTON>
-            <br>
-            Days <input type="text" name="days" value="0" id="days" size="5">
-            Hours <input type="text" name="hours" value="1.0" id="hours" size="4">
-            <BUTTON type="submit" id="set_endtime" onClick="post_form_offset_period(0);this.blur();return false">Set Endtime</BUTTON>
-            &nbsp;&nbsp;
-            <BUTTON type="submit" id="prev_period" onClick="post_form_offset_period(-1);this.blur();return false"> &lt;&lt; </BUTTON>
-            <BUTTON type="submit" id="endnow" onClick="post_form_last_period();this.blur();return false">Now - Period</BUTTON>
-            <BUTTON type="submit" id="next_period" onClick="post_form_offset_period(1);this.blur();return false"> &gt;&gt; </BUTTON>
-            &nbsp;&nbsp;
             <BUTTON type="submit" id="prev_month" onClick="post_form_month(-1);this.blur();return false"> &lt;&lt; </BUTTON>
             <BUTTON type="submit" id="thismonth" onClick="post_form_month(0);this.blur();return false"> This Month </BUTTON>
             <BUTTON type="submit" id="next_month" onClick="post_form_month(1);this.blur();return false"> &gt;&gt; </BUTTON>
+            <br>
+            <BUTTON type="submit" id="last_seen" onClick="set_last_seen();this.blur();">Last Time We Could Ping</BUTTON>
+            <BUTTON type="submit" id="last_traffic" onClick="set_last_traffic();this.blur();">Last Time We Had Traffic</BUTTON>
+            <p>
+            Start <input type="text" id="start_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            End Date-time <input type="text" id="end_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            <br>
+            Days <input type="text" name="days" value="0" id="days" size="5">
+            Hours <input type="text" name="hours" value="1.0" id="hours" size="4">
+            <BUTTON type="submit" id="endnow" onClick="post_form_last_period();this.blur();return false">Set Start to Now - Period</BUTTON>
+            <BUTTON type="submit" id="set_endtime" onClick="post_form_offset_period(0);this.blur();return false">Set End Date to Start + Period</BUTTON>
+            &nbsp;&nbsp;
+            <BUTTON type="submit" id="prev_period" onClick="post_form_offset_period(-1);this.blur();return false"> &lt;&lt; </BUTTON>
+            <BUTTON type="submit" id="next_period" onClick="post_form_offset_period(1);this.blur();return false"> &gt;&gt; </BUTTON>
           </form>
+          <br>
+          <input type="checkbox" id="delayed" value="delayed" onClick="set_delayed(this)"> Delay Request Until one of these is pressed.
           <br>
           <BUTTON type="submit" id="pings_and_traffic" onClick="post_form(this.id);this.blur();return false"> Pings and Traffic </BUTTON>
           <BUTTON type="submit" id="pings" onClick="post_form(this.id);this.blur();return false"> Just Pings </BUTTON>

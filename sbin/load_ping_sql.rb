@@ -11,7 +11,7 @@ require_relative "#{RLIB}/monitor/ping_log.rb"
 
 @mysql_conf = WIKK::Configuration.new(MYSQL_CONF)
 
-t = Time.now
+t = ARGV.length == 2 ? Time.parse(ARGV[1]) : Time.now
 t = (t - t.sec) # just want this to the minute!
 pings_state = Ping_Log.new(@mysql_conf, t)
 pings_state.parse($stdin)

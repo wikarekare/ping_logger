@@ -209,6 +209,24 @@ function post_form_offset_period(direction) {
   }
 }
 
+function post_form_week(direction) {
+  var the_form = document.getElementById('expanded_form');
+  if(direction == 0) {
+    set_now();
+    var start_date = window.now;
+    var tzo = (window.now.getTimezoneOffset()/60)*(-1);
+    start_date.setHours(start_date.getHours() - tzo);
+    year = start_date.getFullYear();
+    month = start_date.getMonth() + 1; //jan == 0?
+    day = start_date.getDate() - start_date.getDay() + 1;
+    the_form.start_datetime.value = year + '-' + ("0" + month).slice(-2) + '-' + ("0" + day).slice(-2) + ' 00:00:00'
+  }
+  the_form.days.value = 7.0;
+  the_form.hours.value = 0.0;
+  window.this_month = false;
+  post_form_offset_period(direction);
+}
+
 function post_form_offset_day(direction) {
   var the_form = document.getElementById('expanded_form');
   the_form.days.value = 1.0;

@@ -60,7 +60,7 @@ class Ping_Log
         if words && words[0] != 'ICMP' && words[1] == ':' # Lines that have ping responses have : there.
           update_pingrecord(words[0], words[2, 6]) # Add this ping record.
         end
-      rescue Exception => e
+      rescue StandardError => _e
         # @log.err("#{datetime} : #{words.join(',')} " + error)
       end
     end
@@ -83,12 +83,21 @@ class Ping_Log
     WIKK::SQL.connect(mysql_conf) do |sql|
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
         ping_max = 1 # minimum value for longest ping, even if max ping response is less. Used for graph generation, to have a minimum y axis max value.
-        sql.each_row("select  ping_time, ping, time1, time2, time3, time4, time5 from pinglog where host_name = '#{host}' and ping_time >= '#{start_time.strftime('%Y-%m-%d %H:%M:%S')}' and ping_time <= '#{end_time.strftime('%Y-%m-%d %H:%M:%S')}' order by ping_time") do |row|
+        query = <<~SQL
+          SELECT ping_time, ping, time1, time2, time3, time4, time5
+          FROM pinglog
+          WHERE host_name = '#{host}'
+          AND ping_time >= '#{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
+          AND ping_time <= '#{end_time.strftime('%Y-%m-%d %H:%M:%S')}'
+          ORDER BY ping_time
+        SQL
+        sql.each_row(query) do |row|
           begin
-            times = row[2..6].collect { |x| x.to_f }
+            times = row[2..6].collect(&:to_f)
             ping_records << Ping_Record.new(host, row[1] == 'T', times, Time.parse(row[0]) )
             times.each { |r| ping_max = r if r > ping_max } # update the maximum ping response value, for graph y axis use.
-          rescue Exception => e
+          rescue StandardError => _e
+            # Ignore errors for this host and continue to the next one.
           end
         end
       end
@@ -127,7 +136,7 @@ class Ping_Log
         end
 
         if @ping_records.length > 0
-          my.query("delete from pinglog  where ping_id = #{@ping_id}")
+          my.query("DELETE FROM pinglog WHERE ping_id = #{@ping_id}")
           my.query('insert into pinglog (ping_id, ping_time, host_name, ping, time1, time2, time3, time4, time5) values ' + sql_ping_values(@ping_id) )
         end
       end
@@ -140,7 +149,7 @@ class Ping_Log
     pr = @ping_records[0]
     value_str = "(#{ping_id}, '#{@datetime.strftime('%Y-%m-%d %H:%M:%S')}', '#{pr.host}', '#{pr.pingable_to_s}', #{pr.ping_times[0]}, #{pr.ping_times[1]}, #{pr.ping_times[2]}, #{pr.ping_times[3]}, #{pr.ping_times[4]})"
 
-    @ping_records[1..-1].each do |pr|
+    @ping_records[1..-1].each do |pr| # rubocop:disable Lint/ShadowingOuterLocalVariable
       value_str << ", (#{ping_id}, '#{@datetime.strftime('%Y-%m-%d %H:%M:%S')}', '#{pr.host}', '#{pr.pingable_to_s}', #{pr.ping_times[0]}, #{pr.ping_times[1]}, #{pr.ping_times[2]}, #{pr.ping_times[3]}, #{pr.ping_times[4]})"
     end
 

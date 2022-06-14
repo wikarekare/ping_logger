@@ -1,3 +1,4 @@
+#  MIT License Wikarekare.org rob@wikarekare.org
 # Individual ping record for a host and datetime.
 class Ping_Record
   attr_accessor :host, :ping_times, :datetime, :failed_count, :average, :ping_max

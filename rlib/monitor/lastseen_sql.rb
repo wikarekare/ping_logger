@@ -1,4 +1,4 @@
-#!/usr/local/bin/ruby
+#  MIT License Wikarekare.org rob@wikarekare.org
 require 'time'
 require 'rubygems'
 require 'mysql'
@@ -29,15 +29,15 @@ class Lastseen
     @now = Time.now
     WIKK::SQL.connect(@mysql_conf) do |sql|
       # there will be one row with a dummy host name called 'datetime', which is the last time we recorded a ping time in the table.
-      sql.each_row("select ping_time from lastping where hostname = 'datetime'") do |row|
-        @datetime = Time.parse(row[0])
+      sql.each_hash("SELECT ping_time FROM lastping WHERE hostname = 'datetime'") do |row|
+        @datetime = Time.parse(row['ping_time'])
       end
       @datetime ||= @now # If there never has been a recorded ping, then default to the current time.
 
       # puts "Getting hosts and ping times from DB"
       # load the ping timestamps as at the time of the creation of the class.
-      sql.each_row("select hostname, ping_time from lastping where hostname != 'datetime'  order by hostname") do |row|
-        @hosts[row[0]] = row[1].nil? ? nil : Time.parse(row[1])
+      sql.each_hash("SELECT hostname, ping_time FROM lastping WHERE hostname != 'datetime' ORDER BY hostname") do |row|
+        @hosts[row['hostname']] = row['ping_time'].nil? ? nil : Time.parse(row['ping_time'])
       end
     end
   end
@@ -184,9 +184,14 @@ class Lastseen
   def self.record_pings(mysql_conf, hosts, datetime)
     WIKK::SQL.connect(mysql_conf) do |sql|
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
-        sql.query("insert into lastping (hostname, ping_time) values ('datetime', '#{datetime.strftime('%Y-%m-%d %H:%M:%S')}') ON DUPLICATE KEY UPDATE ping_time='#{datetime.strftime('%Y-%m-%d %H:%M:%S')}'")
-        hosts.each do |host|
-          sql.query("insert into lastping (hostname, ping_time) values ('#{host}', '#{datetime.strftime('%Y-%m-%d %H:%M:%S')}') ON DUPLICATE KEY UPDATE ping_time='#{datetime.strftime('%Y-%m-%d %H:%M:%S')}'")
+        hosts << 'datetime' # Add last ping reference marker
+        hosts.each do |_host|
+          query = <<~SQL
+            INSERT INTO lastping (hostname, ping_time)
+              VALUES ('datetime', '#{datetime.strftime('%Y-%m-%d %H:%M:%S')}')
+              ON DUPLICATE KEY UPDATE ping_time='#{datetime.strftime('%Y-%m-%d %H:%M:%S')}'
+          SQL
+          sql.query(query)
         end
       end
     end
