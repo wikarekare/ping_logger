@@ -6,7 +6,7 @@ require 'time'
 require 'wikk_configuration'
 load '/wikk/etc/wikk.conf'
 require_relative '../../rlib/monitor/lastseen_sql.rb'
-require_relative '../../rlib/snmp_override.rb'
+require_relative '../../rlib/utility/snmp_override.rb'
 
 port_operation_status = [ 'IF-MIB::ifOperStatus' ]
 port_type = [ 'IF-MIB::ifType' ]
