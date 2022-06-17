@@ -1,0 +1,628 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+  <TITLE>Site Pings</TITLE>
+  <script src="https://www.wikarekare.org/js/RGraph/libraries/RGraph.svg.common.core.js"></script>
+  <script src="https://www.wikarekare.org/js/RGraph/libraries/RGraph.svg.line.js"></script>
+  <script src="https://www.wikarekare.org/js/RGraph/libraries/RGraph.svg.bar.js"></script>
+   <script src="https://www.wikarekare.org/js/RGraph/libraries/RGraph.svg.common.key.js"></script>
+
+  <script src="/js/jquery-3.0.0.min.js"></script>
+  <script src="/js/wikk_ajax-min.js"></script>
+  <script src="/js/wikk_web_auth-min.js"></script>
+  <script src="/js/wikk_params.js"></script>
+  <script src="/js/traffic_comms.js"></script>
+  <script src="/js/ping_graph.js"></script>
+
+  <script type="text/javascript">
+      var now ;
+
+      //Add monthDays to the Date class
+      // @return [numeric] days in the month
+      Date.prototype.monthDays= function(){
+          var d = new Date(this.getFullYear(), this.getMonth()+1, 0);
+          return d.getDate();
+      }
+
+      function average(a) {
+        if ( a.length == 0 ) { return 0; }
+        var total = 0;
+        for(var i = 0; i < a.length; i++) {
+            total += a[i];
+        }
+        return total / a.length;
+      }
+
+      function median(a) {
+        if ( a.length == 0 ) { return 0; }
+        a.sort((a, b) => a - b);
+        return (a[(a.length - 1) >> 1] + a[a.length >> 1]) / 2.0
+      }
+
+      //Update date of the last request in the datetime span
+      function set_now() {
+        var datetime_span = document.getElementById('datetime');
+        window.now = new Date();
+        var tzo = (window.now.getTimezoneOffset()/60)*(-1);
+        window.now.setHours(window.now.getHours() + tzo);
+        datetime_span.innerHTML = window.now.toISOString().slice(0, 19).replace('T', ' ');
+      }
+
+      function date_offset(date, days, hours) {
+        var tzo = -window.now.getTimezoneOffset()/60;
+        var new_date = new Date(date.value.slice(0, 19).replace(' ', 'T')+'Z');
+        new_date.setSeconds(0);
+        new_date.setDate(new_date.getDate() + days) ;
+        new_date.setHours(new_date.getHours() + hours);
+        return new_date.toISOString().slice(0, 19).replace('T', ' ');
+      }
+
+      function init_start_datetime(start_time, end_time, days, hours) {
+        var the_form = document.getElementById('expanded_form');
+        set_now();
+        if(days == null) days = 0.0;
+        if(hours == null) hours = (days == 0.0)  ? 1.0 : 0.0;
+        if(hours == 0.0 && days == 0.0) hours = 1.0;
+        the_form.days.value = days;
+        the_form.hours.value = hours;
+
+        if(start_time != null) {
+          the_form.start_datetime.value = start_time
+          if(end_time != null) {
+            the_form.end_datetime.value = end_time
+            start = new Date(start_time.slice(0, 19).replace(' ', 'T'));
+            end = new Date(end_time.slice(0, 19).replace(' ', 'T'));
+            dec_days = (end.getTime() - start.getTime())/86400000.0
+            num_days = Math.floor(dec_days)
+            the_form.days.value = num_days
+            the_form.hours.value = (dec_days - num_days) * 864 / 36
+          } else {
+            the_form.end_datetime.value = date_offset(the_form.start_datetime, days, hours)
+          }
+        } else {
+          if(end_time != null) {
+            the_form.end_datetime.value = end_time
+            the_form.start_datetime.value = date_offset(the_form.end_datetime, -days, -hours)
+          } else {
+            var end_date = window.now;
+            end_date.setSeconds(0);
+            the_form.end_datetime.value = end_date.toISOString().slice(0, 19).replace('T', ' ');
+            the_form.start_datetime.value = date_offset(the_form.end_datetime, -days, -hours);
+          }
+        }
+        window.this_month = false;
+      }
+
+      function post_form(button_id) {
+        set_now();
+        if(button_id == 'pings')
+          wikk_ping_graph.graph_data('expanded_form', graph_pings);
+        else if (button_id == 'traffic') {
+          wikk_traffic.graph_data('expanded_form', graph_traffic);
+        }
+
+      }
+
+      function toggle_form_state() {
+        var simple_state_div = document.getElementById("simple");
+        var admin_state_div = document.getElementById("extended");
+        var other_sites_span = document.getElementById("other_sites");
+        var image1 = document.getElementById('form_state');
+
+        if(wikk_web_auth.authenticated()) {
+          if(simple_form) {
+            simple_form = false;
+            //simple_state_div.style.display = 'none';
+            admin_state_div.style.display = 'block';
+            other_sites_span.style.display = 'block';
+            image1.src = imageExpandedTriangle.src;
+          } else {
+            simple_form = true;
+            //simple_state_div.style.display = 'block';
+            admin_state_div.style.display = 'none';
+            other_sites_span.style.display = 'none';
+            image1.src = imageCloseTriangle.src;
+          }
+        } else {
+          if(simple_form == false) {
+            simple_form = true;
+            //simple_state_div.style.display = 'block';
+            admin_state_div.style.display = 'none';
+            other_sites_span.style.display = 'none';
+            image1.src = imageCloseTriangle.src;
+          }
+        }
+        return true;
+      }
+
+      function init() {
+        init_start_datetime();
+        delay_sending = false;
+        simple_form = false;
+
+        var params = wikk_params.getURLParameters();
+        var start_time = wikk_params.get_argv('start_time');
+        var end_time = wikk_params.get_argv('end_time');
+        var hostname = wikk_params.get_argv('host');
+
+        wikk_web_auth.logged_in(true, "/admin/ping.html", "login_span", null);
+        wikk_ping_graph.graph_data('expanded_form');
+      }
+
+      var ping_svg_obj = null;
+      var traffic_svg_obj = null;
+      var signal_svg_obj = null;
+
+      function graph_pings(result) {
+          xaxisLabels = [];
+          line1 = [];
+          line2 = [];
+          line3 = [];
+          line4 = [];
+          line5 = [];
+          midline = [];
+          xaxisTickmarks = [];
+          xaxisTickmarksData = [];
+          averageline = [];
+          max_value = 0;
+          stack = [];
+          stack_xaxisLabels = [];
+          no_data = [];
+          failed = [[],[],[],[],[]];
+          points = result.rows;
+          hostname = result.hostname;
+
+          //Find the overall maximum value, so we can set the yaxis max
+          //Also check for failed pings, and calculate the median and average for each row
+          for( var i = 0; i < points.length; i++ ) {
+            //prefill nodata with 0s. Using separate index 't', as we may insert entries
+            no_data[i] = points[i].times.length == 0 ? 1:0 ;
+
+            //prefill failure arrays with 0s, for this point.
+            for(j = 0; j < 5; j++ ) { failed[j][i] = 0; }
+
+            if (points[i].times[4] > max_value ) {
+              max_value = points[i].times[4];
+            }
+            //remove -1 values, which represent a failed ping
+            failed_index = -1; //no failed pings yet
+            for(var j = 0; j < 5; j++) {
+              if(points[i].times[0] == -1) {
+                points[i].times.shift();  //remove the -1
+                failed_index += 1;    //inc index
+              }
+            }
+            points[i].failed_index = failed_index;
+            points[i].median = median(points[i].times);
+            points[i].average = average(points[i].times);
+            if (points[i].median == 0) points[i].median = null ;
+            if (points[i].average == 0) points[i].average = null;
+          }
+          //overall maximum y, for all points. Used to set yaxis range.
+          max_y = Math.round(max_value + 1);
+
+          //refill ping rows, replicating the max row value in the missing columns
+          //Also fix set the failed[] values for this point.
+          for( var i = 0; i < points.length; i++ ) {
+            //Set highest failure level's array value to max_y, so bar goes to the top.
+            if (points[i].failed_index != -1) {
+              failed[points[i].failed_index][i] = max_y;
+            }
+
+            if (points[i].times.length == 0 ) {
+              //total failure, so all values infinite, but 0 is nicer.
+              points[i].times = [0,0,0,0,0];
+            }
+            else {
+              //Might be 1 or more failed points
+              max_row_y = points[i].times[points[i].times.length-1];
+              for(j=points[i].times.length; j < 5; j++ ) {
+                points[i].times.push(max_row_y);
+              }
+            }
+
+            no_data[i] = no_data[i] == 1 ? max_y : 0;
+          }
+
+          //Converts the points array into individual plotting arrays
+          p = 0;
+          t = 0;
+          for( var i = 0; i < points.length; i++ ) {
+            if(i%(Math.trunc(points.length/4)) == 0) {
+              xaxisTickmarks.push(points[i].ping_time.replace(' ',"\n"));
+              xaxisTickmarksData.push( null );
+            }
+
+            stack_xaxisLabels[i] = '';
+            xaxisLabels[p] = '';
+            xaxisLabels[p+1] = '';
+            xaxisLabels[p+2] = '';
+
+            //Stacked bars to render the ping variance from the mean.
+            line1[i] = points[i].times[0];                   //transparent bar to this point
+            line2[i] = points[i].times[1] - points[i].times[0];  //#eceeff
+            line3[i] = points[i].times[2] - points[i].times[1];  //#ccccff
+            line4[i] = points[i].times[3] - points[i].times[2];  //#ccccff
+            line5[i] = points[i].times[4] - points[i].times[3];  //#eceeff
+            stack[i] = [line1[i],line2[i],line3[i],line4[i],line5[i]];
+
+            //Median and Average lines, with a duplicate point either side, to create square wave
+            midline[p] = points[i].median;
+            averageline[p] = points[i].average;
+            midline[p+1] = midline[p];
+            averageline[p+1] = averageline[p];
+            midline[p+2] = midline[p];
+            averageline[p+2] = averageline[p];
+
+            p += 3;
+          }
+
+          if (ping_svg_obj != null) {
+            RGraph.SVG.clear(ping_svg_obj.svg);
+          }
+
+          ping_svg_obj = new RGraph.SVG.Line({
+            id: 'cc_ping',
+            data: xaxisTickmarksData,
+            options: {
+              title: "Ping times " + hostname,
+              key: ['Median','Average','No Data','1','2','3','4','All Failed'],
+              keyColors: ['#000000','#00ff00', 'yellow', '#ccffff', '#99ffff', '#4dffff', '#00ffff', '#ff4455' ],
+
+              yaxisScaleMax: max_y,
+              yaxisTitle: 'Ping Time in ms',
+
+              marginTop: 55,
+              marginRight: 35,
+              marginLeft: 50,
+              marginBottom: 70,
+              backgroundGridVlines: false,
+              backgroundGridBorder: false,
+
+              linewidth: 1,
+              textSize: 10,
+
+              xaxis: true,
+              xaxisLinewidth: 1,
+              xaxisLabels: xaxisTickmarks,
+              xaxisTickmarksLength: 12
+            }
+          }).draw();
+
+          //light to darker blue, then red, for 1 through 5 ping failures
+          failure_colours = ['#ccffff', '#99ffff', '#4dffff', '#00ffff', '#ff4455'];
+          for(j = 0; j < 5; j++) {
+            new RGraph.SVG.Bar({
+                id: 'cc_ping',
+                data: failed[j],
+                options: {
+                  yaxisScaleMax: max_y,
+                  yaxis: false,
+                  yaxisScale: false,
+                  yaxisTickmarks: false,
+
+                  xaxisTickmarksCount: 0,
+                  xaxisLinewidth: 1,
+                  xaxisTickmarks: false,
+                  xaxis: false,
+                  xaxisLinewidth: 1,
+
+                  backgroundGridVlines: false,
+                  backgroundGridHlines: false,
+                  backgroundGridBorder: false,
+                  backgroundGrid: false,
+
+                  colors:[failure_colours[j]],
+                  textSize: 10,
+                  xaxisLabels: stack_xaxisLabels,
+                  marginTop: 55,
+                  marginRight: 35,
+                  marginLeft: 50,
+                  marginBottom: 70,
+
+                  marginInner: 0,
+                }
+            }).draw();
+          }
+          //no data. yellow background, if no data for this point.
+          new RGraph.SVG.Bar({
+              id: 'cc_ping',
+              data: no_data,
+              options: {
+                yaxisScaleMax: max_y,
+                yaxis: false,
+                yaxisScale: false,
+                yaxisTickmarks: false,
+
+                xaxisTickmarksCount: 0,
+                xaxisLinewidth: 1,
+                xaxisTickmarks: false,
+                xaxis: false,
+                xaxisLabels: stack_xaxisLabels,
+
+                backgroundGridVlines: false,
+                backgroundGridHlines: false,
+                backgroundGridBorder: false,
+                backgroundGrid: false,
+
+                colors:['#ffff88'],
+                textSize: 10,
+                marginTop: 55,
+                marginRight: 35,
+                marginLeft: 50,
+                marginBottom: 70,
+                marginInner: 0,
+              }
+          }).draw();
+
+          new RGraph.SVG.Bar({
+              id: 'cc_ping',
+              data: stack,
+              options: {
+
+                yaxisScaleMax: max_y,
+                yaxis: false,
+                yaxisScale: false,
+                yaxisTickmarks: false,
+
+                xaxisTickmarksCount: 0,
+                xaxisTickmarks: false,
+                xaxisLinewidth: 1,
+                xaxis: false,
+
+                xaxisLabels: stack_xaxisLabels,
+
+                backgroundGridVlines: false,
+                backgroundGridHlines: false,
+                backgroundGridBorder: false,
+
+                colors:['transparent', '#eceeff', '#ccccff', '#ccccff', '#eceeff'],
+                grouping: 'stacked',
+                textSize: 10,
+                marginTop: 55,
+                marginRight: 35,
+                marginLeft: 50,
+                marginBottom: 70,
+                backgroundGrid: false,
+                marginInner: 0,
+              }
+          }).draw();
+
+          //Median and Average lines in Black and Green.
+          new RGraph.SVG.Line({
+              id: 'cc_ping',
+              data: [midline,averageline],
+              options: {
+                yaxis: false,
+                yaxisScale: false,
+                yaxisScaleMax: max_y,
+                yaxisTickmarks: false,
+
+                // Here's the colors being set - note the first is transparent
+                // so we don't see it.
+                colors: ['black','#00ff00'],
+                marginTop: 55,
+                marginRight: 35,
+                marginLeft: 50,
+                marginBottom: 70,
+                backgroundGridVlines: false,
+                backgroundGridHlines: false,
+                backgroundGridBorder: false,
+                linewidth: 1,
+
+                xaxis: false,
+                xaxisLinewidth: 1,
+                xaxisLabels: xaxisLabels,
+                xaxisTickmarks: false,
+              }
+          }).draw();
+        }
+
+        function graph_traffic(result) {
+          xaxisLabels = [];
+          xaxisTickmarks = [];
+          xaxisTickmarksData = [];
+          max_value = 0.0;
+          stack = [];
+          stack_xaxisLabels = [];
+          no_data = [];
+          points = result.rows;
+          hostname = result.hostname;
+
+          //Find the overall maximum value, so we can set the yaxis max
+          for (var i = 0; i < points.length; i++) {
+            t = points[i].mbytes_in + points[i].mbytes_out;
+            if (t > max_value) {
+              max_value = t;
+            }
+          }
+          //overall maximum y, for all points. Used to set yaxis range.
+          max_y = Math.round(max_value + 1);
+
+          //Converts the points array into individual plotting arrays
+          for (var i = 0; i < points.length; i++) {
+            //xaxis labels
+            if (i % (Math.trunc(points.length / 4)) == 0) {
+              xaxisTickmarks.push(points[i].log_timestamp.replace(' ', "\n"));
+              xaxisTickmarksData.push(null);
+            }
+
+            stack_xaxisLabels[i] = '';
+            xaxisLabels[i] = '';
+
+            if (points[i].mbytes_in == null) {
+              stack[i] = [0, 0];
+              no_data[i] = max_y;
+            } else {
+              //Stacked bars to render the ping variance from the mean.
+              stack[i] = [points[i].mbytes_in, points[i].mbytes_out];
+              no_data[i] = 0;
+            }
+          }
+
+          if (traffic_svg_obj != null) {
+            RGraph.SVG.clear(traffic_svg_obj.svg);
+          }
+
+          traffic_svg_obj = new RGraph.SVG.Line({
+            id: 'cc_traffic',
+            data: xaxisTickmarksData,
+            options: {
+              title: "Traffic for " + hostname,
+              key: ['Download', 'Upload'], //
+              keyColors: ['red', '#00ff00'],
+
+              yaxisScaleMax: max_y,
+              yaxisTitle: 'MBytes',
+
+              marginTop: 55,
+              marginRight: 35,
+              marginLeft: 70,
+              marginBottom: 70,
+              backgroundGridVlines: false,
+              backgroundGridBorder: false,
+
+              linewidth: 1,
+              textSize: 10,
+
+              xaxis: true,
+              xaxisLinewidth: 1,
+              xaxisLabels: xaxisTickmarks,
+              xaxisTickmarksLength: 12,
+              xaxisLabelsAngle: 0
+            }
+          }).draw();
+
+          //no data. yellow background, if no data for this point.
+          new RGraph.SVG.Bar({
+            id: 'cc_traffic',
+            data: no_data,
+            options: {
+              yaxisScaleMax: max_y,
+              yaxis: false,
+              yaxisScale: false,
+              yaxisTickmarks: false,
+
+              xaxisTickmarksCount: 0,
+              xaxisLinewidth: 1,
+              xaxisTickmarks: false,
+              xaxis: false,
+              xaxisLabels: stack_xaxisLabels,
+
+              backgroundGridVlines: false,
+              backgroundGridHlines: false,
+              backgroundGridBorder: false,
+              backgroundGrid: false,
+
+              colors: ['#ffff88'],
+              textSize: 10,
+              marginTop: 55,
+              marginRight: 35,
+              marginLeft: 70,
+              marginBottom: 70,
+              marginInner: 0,
+            }
+          }).draw();
+
+          new RGraph.SVG.Bar({
+            id: 'cc_traffic',
+            data: stack,
+            options: {
+
+              yaxisScaleMax: max_y,
+              yaxis: false,
+              yaxisScale: false,
+              yaxisTickmarks: false,
+
+              xaxisTickmarksCount: 0,
+              xaxisTickmarks: false,
+              xaxisLinewidth: 1,
+              xaxis: false,
+
+              xaxisLabels: stack_xaxisLabels,
+
+              backgroundGridVlines: false,
+              backgroundGridHlines: false,
+              backgroundGridBorder: false,
+
+              colors: ['red', '#00ff00'],
+              grouping: 'stacked',
+              textSize: 10,
+              marginTop: 55,
+              marginRight: 35,
+              marginLeft: 70,
+              marginBottom: 70,
+              backgroundGrid: false,
+              marginInner: 0,
+            }
+          }).draw();
+        }
+
+  </script>
+  <META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+  <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+</HEAD>
+<BODY onload="init();">
+  <div style="padding-left: 0px">
+    <span id='simple' style="margin-left:0px;display:block;" >
+        <span style="text-align: center; float:left;">
+          <BUTTON type="submit" id="prev_hour" onClick="post_form_offset_hour(-1);this.blur();">  &lt;&lt; </BUTTON>
+          <BUTTON type="submit" id="last_hour" onClick="post_form_last_hour();this.blur();">  Last Hour </BUTTON>
+          <BUTTON type="submit" id="next_hour" onClick="post_form_offset_hour(1);this.blur();">  &gt;&gt; </BUTTON>
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <BUTTON type="submit" id="prev_day" onClick="post_form_offset_day(-1);this.blur();">  &lt;&lt; </BUTTON>
+          <BUTTON type="submit" id="last_day" onClick="post_form_today();this.blur();">  Today </BUTTON>
+          <BUTTON type="submit" id="next_day" onClick="post_form_offset_day(1);this.blur();">  &gt;&gt; </BUTTON>
+          &nbsp;&nbsp;&nbsp;&nbsp;
+        </span>
+
+        <span style="text-align: right; float:right;">
+          <span id="login_span"></span> &nbsp;
+          <img id='form_state' src="/images/closedTriangle.gif"  onclick="toggle_form_state();" /> &nbsp; <span id="datetime">0000-00-00 00:00:00</span>
+          <br>
+          <span id='other_sites' style="display:none;">
+            <select id='site_list_1' onchange="switch_customers(this.value);"> </select>
+          </span>
+        </span>
+    </span> <br>
+    <span id='extended' style="margin-left:0px;display:block;" >
+        <p><span style="margin-left:0px; text-align:left; float:left;">
+          <form id='expanded_form' onSubmit="return false;">
+            <BUTTON type="submit" id="prev_month" onClick="post_form_month(-1);this.blur();return false"> &lt;&lt; </BUTTON>
+            <BUTTON type="submit" id="thismonth" onClick="post_form_month(0);this.blur();return false"> This Month </BUTTON>
+            <BUTTON type="submit" id="next_month" onClick="post_form_month(1);this.blur();return false"> &gt;&gt; </BUTTON>
+            <br>
+            <BUTTON type="submit" id="last_seen" onClick="set_last_seen();this.blur();">Last Time We Could Ping</BUTTON>
+            <BUTTON type="submit" id="last_traffic" onClick="set_last_traffic();this.blur();">Last Time We Had Traffic</BUTTON>
+            <p>
+            Host <input type="text" id="host" style="width: 125px; padding: 5px" size="19" value="wikkb33">
+            Start <input type="text" id="start_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            End Date-time <input type="text" id="end_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            <br>
+            Days <input type="text" name="days" value="0" id="days" size="5">
+            Hours <input type="text" name="hours" value="1.0" id="hours" size="4">
+
+            <BUTTON type="submit" id="endnow" onClick="post_form_last_period();this.blur();return false">Set Start to Now - Period</BUTTON>
+            <BUTTON type="submit" id="set_endtime" onClick="post_form_offset_period(0);this.blur();return false">Set End Date to Start + Period</BUTTON>
+            &nbsp;&nbsp;
+            <BUTTON type="submit" id="prev_period" onClick="post_form_offset_period(-1);this.blur();return false"> &lt;&lt; </BUTTON>
+            <BUTTON type="submit" id="next_period" onClick="post_form_offset_period(1);this.blur();return false"> &gt;&gt; </BUTTON>
+          </form>
+          <br>
+          <input type="checkbox" id="delayed" value="delayed" onClick="set_delayed(this)"> Delay Request Until one of these is pressed.
+          <br>
+          <BUTTON type="submit" id="pings_and_traffic" onClick="post_form(this.id);this.blur();return false"> Pings and Traffic </BUTTON>
+          <BUTTON type="submit" id="pings" onClick="post_form(this.id);this.blur();return false"> Just Pings </BUTTON>
+          <BUTTON type="submit" id="traffic" onClick="post_form(this.id);this.blur();return false"> Just Traffic </BUTTON>
+          <BUTTON type="submit" id="host_histogram" onClick="post_form(this.id);this.blur();return false"> Ext-Host Histogram </BUTTON>
+          <BUTTON type="submit" id="internal_hosts" onClick="post_form(this.id);this.blur();return false"> Internal Hosts </BUTTON>
+          <BUTTON type="submit" id="port_histogram" onClick="post_form(this.id);this.blur();return false"> Port Histogram </BUTTON>
+          <BUTTON type="submit" id="usage" onClick="post_form(this.id);this.blur();return false"> Usage </BUTTON>
+        </span> </p>
+    </span>
+  </div>
+  <div id="cc_traffic" style="width: 720px; height: 405px"></div>
+  <div id="cc_ping" style="width: 720px; height: 405px"></div>
+  <div id="cc_signal" style="width: 720px; height: 405px"></div>
+</BODY>
+</HTML>
