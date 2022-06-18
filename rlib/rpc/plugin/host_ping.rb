@@ -21,7 +21,7 @@ class Host_ping < RPC
 
     ms = '-'
     t = Time.now.strftime('%Y-%m-%d %H:%M:%S')
-    stderr_result, stdin_result = Open3.capture2e(FPING, '-C', '1', '-q', hostname)
+    stderr_result, _status = Open3.capture2e(FPING, '-C', '1', '-q', hostname)
 
     # Fping returns results on stderr
     ms = stderr_result.split(':')[1].strip if stderr_result != nil && stderr_result != ''
