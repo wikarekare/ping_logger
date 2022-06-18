@@ -1,3 +1,0 @@
-#!/bin/bash
-# To be run from Ansible, after it has pulled the appropriate version
-rsync -arv --no-owner --files-from=manifest . ${WIKK_TARGET}
