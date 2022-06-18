@@ -13,7 +13,7 @@ class Host_ping < RPC
     # new record
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :read do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     select_on.each { |k, _v| acceptable(field: k, acceptable_list: @select_acl) } if select_on != nil
     result.each { |k, _v| acceptable(field: k, acceptable_list: @result_acl) } if result != nil
     hostname = select_on['hostname']
@@ -29,11 +29,11 @@ class Host_ping < RPC
     return { 'hostname' => hostname, 'ms' => ms, 'time' => t }
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :update do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     # We don't actually do this.
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :delete do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     # We don't actually do this.
   end
 end

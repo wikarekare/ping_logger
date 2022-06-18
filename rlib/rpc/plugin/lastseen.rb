@@ -16,7 +16,7 @@ class LastSeen < RPC
     # new customer record
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :read do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     # Pull data about customer
     where_string = to_where(select_on: select_on, acceptable_list: @select_acl)
     select_string = to_result(result: result, acceptable_list: @result_acl)
@@ -24,7 +24,7 @@ class LastSeen < RPC
     return sql_single_table_select(table: 'lastping', select: select_string, where: where_string, order_by: order_by_string)
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :update do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     # change user fields
     where_string = to_where(select_on: select_on, acceptable_list: @select_acl)
     set_string = to_set(set: set, acceptable_list: @set_acl)
@@ -33,12 +33,12 @@ class LastSeen < RPC
     return sql_single_table_update(table: 'lastping', set: set_string, where: where_string)
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :delete do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     # We don't actually do this.
   end
 
   # need to change this to incorporate Lastseen into new LastSeen
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :global_state do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
     lastseen = Lastseen.new(@config)
     return lastseen.global_state
   end
