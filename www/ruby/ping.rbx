@@ -445,7 +445,7 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
             "<input type=\"image\" src=\"#{@form_on == true ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}\"  onclick=\"correct_form_on(this.form)\" />" +
 
             # "<a href=\"/ruby/ping.rbx?host=#{@hosts[0]}#{@form_on == true ? "&form=off" : "&form=on" }#{@dist ? '&@dist=true' : ''}#{@graphtype == "" ? "" : "&@graphtype=#{@graphtype}"}\" >\n" +
-            # "<img  border=0 src=#{@form_on == true ? '/images/expandedTriangle.gif' : '/icons/blank.gif' }></a>" +
+            # "<img  border=0 src=#{@form_on == true ? '/images/expandedTriangle.gif' : '/wikk_icons/blank.gif' }></a>" +
             "#{Time.now}</div><br>\n" +
             ( @dist ? "<input type=\"hidden\" name=\"dist\" value=\"true\" id=\"dist\">\n" : '' ) +
             ( @link == 'true' ? "<input type=\"hidden\" name=\"link\" value=\"true\" id=\"link\">\n" : '' ) +
