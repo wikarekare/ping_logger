@@ -28,7 +28,7 @@ class Pings < RPC
     EOT
     last_time = Time.parse(select_on['start_time'])
     rows = []
-    WIKK::SQL.connect(@config) do |sql|
+    WIKK::SQL.connect(@db_config) do |sql|
       sql.each_hash(query) do |row|
         ping_time = Time.parse(row['ping_time'])
         time_range(start_time: last_time, end_time: ping_time, step: 60) do |t|

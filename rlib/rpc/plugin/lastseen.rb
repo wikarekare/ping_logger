@@ -39,7 +39,7 @@ class LastSeen < RPC
 
   # need to change this to incorporate Lastseen into new LastSeen
   rmethod :global_state do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
-    lastseen = Lastseen.new(@config)
+    lastseen = Lastseen.new(@db_config)
     return lastseen.global_state
   end
 end
