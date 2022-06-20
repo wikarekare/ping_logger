@@ -13,7 +13,7 @@ class Graph_Ping_Log < Ping_Log
   def self.graph_clients(mysql_conf, dist_host, start_time, end_time)
     images = ''
     # Select the hosts connected to the distribution node.
-    WIKK::SQL.connect(mysql_conf) do |my|
+    WIKK::SQL.connect(mysql_conf) do |sql|
       query = <<~SQL
         SELECT customer.site_name AS wikk
         FROM distribution, customer, customer_distribution
@@ -22,7 +22,7 @@ class Graph_Ping_Log < Ping_Log
         AND customer_distribution.customer_id = customer.customer_id
         ORDER BY wikk
       SQL
-      my.each_hash(query) do |row|
+      sql.each_hash(query) do |row|
         ping_record = Ping_Log.new(mysql_conf)
         if (_error = ping_record.gnuplot(row['site_name'], start_time, end_time) ).nil?
           images << "<img src=\"/#{NETSTAT_DIR}/#{row['site_name']}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"

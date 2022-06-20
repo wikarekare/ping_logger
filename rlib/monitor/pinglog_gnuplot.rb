@@ -28,7 +28,7 @@ class Ping
 
   def self.graph_clients(mysql_conf, dist_host, start_time, end_time)
     images = ''
-    WIKK::SQL.connect(@mysql_conf) do |_sql|
+    WIKK::SQL.connect(@mysql_conf) do |sql|
       query = <<~SQL
         SELECT customer.site_name AS wikk
         FROM distribution, customer, customer_distribution
@@ -37,7 +37,7 @@ class Ping
         AND customer_distribution.customer_id = customer.customer_id
         ORDER BY wikk
       SQL
-      res.each_hash(query) do |row|
+      sql.each_hash(query) do |row|
         ping_record = Ping.new(mysql_conf)
         if ping_record.gnuplot(row['site_name'], start_time, end_time).nil?
           images << "<img src=\"/#{NETSTAT_DIR}/#{row[0]}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
@@ -118,7 +118,7 @@ class Ping
           query = <<~SQL
             SELECT sequence_nextval('ping_log.ping_id') AS seq
           SQL
-          res.each_hash(query) do |row|
+          sql.each_hash(query) do |row|
             @ping_id = row['seq'].to_i
           end
 
@@ -151,7 +151,7 @@ class Ping
         AND ping_time <= '#{end_time.strftime('%Y-%m-%d %H:%M:%S')}'
         ORDER BY ping_time
       SQL
-      sql.each_row(query) do |row|
+      sql.each_row(query) do |row| # Array return
         begin
           times = row[2..6].collect(& :to_f )
           tm = row[0].is_a?( String ) ? Time.parse(row[0]) : row[0]

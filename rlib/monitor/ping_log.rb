@@ -128,17 +128,23 @@ class Ping_Log
 
   # Save the record to the SQL DB
   private def sql_record_of_ping_results
-    WIKK::SQL.connect(@mysql_conf) do |my|
-      my.transaction do
-        my.query("select sequence_nextval('ping_log.ping_id')") do |res|
-          res.each do |row|
-            @ping_id = row[0].to_i
-          end
+    WIKK::SQL.connect(@mysql_conf) do |sql|
+      sql.transaction do
+        query = <<~SQL
+          select sequence_nextval('ping_log.ping_id') as seq
+        SQL
+        sql.each_hash(query) do |row|
+          @ping_id = row['seq'].to_i
         end
 
         if @ping_records.length > 0
-          my.query("DELETE FROM pinglog WHERE ping_id = #{@ping_id}")
-          my.query('insert into pinglog (ping_id, ping_time, host_name, ping, time1, time2, time3, time4, time5) values ' + sql_ping_values(@ping_id) )
+          sql.query <<~SQL
+            DELETE FROM pinglog WHERE ping_id = #{@ping_id}
+          SQL
+          sql.query <<~SQL
+            INSERT INTO pinglog (ping_id, ping_time, host_name, ping, time1, time2, time3, time4, time5)
+            VALUES #{sql_ping_values(@ping_id)}
+          SQL
         end
       end
     end
