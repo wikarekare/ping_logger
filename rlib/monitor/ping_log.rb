@@ -91,10 +91,11 @@ class Ping_Log
           AND ping_time <= '#{end_time.strftime('%Y-%m-%d %H:%M:%S')}'
           ORDER BY ping_time
         SQL
-        sql.each_row(query) do |row|
+        sql.each_row(query) do |row| # Array returned.
           begin
             times = row[2..6].collect(&:to_f)
-            ping_records << Ping_Record.new(host, row[1] == 'T', times, Time.parse(row[0]) )
+            tm = row[0].is_a?( String ) ? Time.parse(row[0]) : row[0]
+            ping_records << Ping_Record.new(host, row[1] == 'T', times, tm )
             times.each { |r| ping_max = r if r > ping_max } # update the maximum ping response value, for graph y axis use.
           rescue StandardError => _e
             # Ignore errors for this host and continue to the next one.

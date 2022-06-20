@@ -1,9 +1,10 @@
 #  MIT License Wikarekare.org rob@wikarekare.org
 require 'time'
 require 'rubygems'
-require 'mysql'
+require 'wikk_sql'
+require 'wikk_configuration'       # Just for testing
+require_relative '../wikk_conf.rb' # Just for testing
 # require_relative 'host_cluster.rb' # Start of cleanup
-
 
 # Last time we recorded a successful ping for a host
 class Lastseen
@@ -15,8 +16,8 @@ class Lastseen
 
   attr_reader :datetime, :clusters
 
-  def initialize(db_conf)
-    @mysql_conf = db_conf
+  def initialize(db_conf = nil)
+    @mysql_conf = db_conf.nil? ? WIKK::Configuration.new(MYSQL_CONF) : db_conf
     sync
   end
 
@@ -28,7 +29,6 @@ class Lastseen
     @datetime = nil
 
     WIKK::SQL.connect(@mysql_conf) do |sql|
-
       # there will be one row with a dummy host name called 'datetime', which is the last time we recorded a ping time in the table.
       query = <<~SQL
         SELECT hostname, ping_time
@@ -36,13 +36,15 @@ class Lastseen
         ORDER BY hostname
       SQL
 
-    # puts "Getting hosts and ping times from DB"
-    # load the ping timestamps as at the time of the creation of the class.
+      # puts "Getting hosts and ping times from DB"
+      # load the ping timestamps as at the time of the creation of the class.
       sql.each_hash(query) do |row|
+        # Ruby-mysql connector returns a String. Mysql2 connector returns Time
+        tm = row['ping_time'].is_a?( String ) ? Time.parse(row['ping_time']) : row['ping_time']
         if row['hostname'] == 'datetime'
-          @datetime = Time.parse(row['ping_time']) unless row['ping_time'].nil?
+          @datetime = tm unless tm.nil?
         else
-          @hosts[row['hostname']] = row['ping_time'].nil? ? nil : Time.parse(row['ping_time'])
+          @hosts[row['hostname']] = tm
         end
       end
 
@@ -165,6 +167,7 @@ class Lastseen
   # Cluster colour, for graphing the state of a cluster of hosts.
   # @param hosts [Array] hostnames of hosts in a cluster
   # @return [String] colour representing the status of the cluster  def cluster_colour(hosts)
+  def cluster_colour(hosts)
     return  state_colour(:unknown) if hosts.length == 0
 
     worst = :ok        # Start with great optimism
@@ -202,6 +205,7 @@ class Lastseen
   end
 
   def self.test
+    puts 'In test: Iterating over host status from DB'
     Lastseen.new.global_state.each do |key, value|
       print "#{key}\t#{value}\n"
     end
@@ -209,7 +213,6 @@ class Lastseen
 
   def self.record_pings(mysql_conf, hosts, datetime)
     WIKK::SQL.connect(mysql_conf) do |sql|
-
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
         hosts << 'datetime' # Add last ping reference marker
         hosts.each do |host|

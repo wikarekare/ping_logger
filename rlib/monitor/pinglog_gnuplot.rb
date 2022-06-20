@@ -1,101 +1,12 @@
 require 'syslog'
 require 'rubygems'
 require 'mysql'
-require_relative 'lastseen_sql.rb'
 require 'tmpfile'
 require 'time'
+require_relative 'lastseen_sql.rb'
+require_relative 'ping_record.rb'
 
-class Ping_Record
-  attr_accessor :host, :ping_times, :datetime, :failed_count, :average
-
-  def initialize(host, pingable, ping_times, datetime )
-    @host = host
-    @pingable = pingable
-    @ping_times = ping_times # Array.
-    set_failed_count_and_average
-    @datetime = datetime
-    @ping_max = 0
-  end
-
-  def pingable?
-    @pingable
-  end
-
-  def pingable_to_s
-    @pingable == true ? 'T' : 'F'
-  end
-  alias pingable pingable_to_s # Backward compatibility.
-
-  def set_failed_count_and_average
-    @failed_count = 0
-    sum = count = 0
-    @ping_times.each do |t|
-      if t == -1
-        @failed_count += 1
-      else
-        sum += t
-        count += 1
-      end
-    end
-
-    @average = if count > 0
-                 sum / count
-               else
-                 0
-               end
-  end
-
-  def self.print_no_data(fd, datetime, max)
-    @average = 0
-    # Output 2 rows, one either side of the ping, so we remove mountain peaks from line graph.
-    fd.print "#{(datetime - 30).strftime('%Y-%m-%d %H:%M:%S')}\t-\t-\t-\t-\t-" # We have no ping record.
-    fd.print "\t0\t0\t0\t0\t0\t#{max}\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-
-    fd.print "#{(datetime + 29).strftime('%Y-%m-%d %H:%M:%S')}\t-\t-\t-\t-\t-" # We have no ping record.
-    fd.print "\t0\t0\t0\t0\t0\t#{max}\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-  end
-
-  def print_row_body(fd, datetime, max)
-    case @failed_count
-    when 0 # Got All pings
-      fd.print "#{datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{@ping_times[0]}\t#{@ping_times[1]}\t#{@ping_times[2]}\t#{@ping_times[3]}\t#{@ping_times[4]}"
-      fd.print "\t0\t0\t0\t0\t0\t0\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-    when 1 # Lost 1
-      fd.print "#{datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{@ping_times[1]}\t#{@ping_times[2]}\t#{(@ping_times[2] + @ping_times[3]) / 2}\t#{@ping_times[3]}\t#{@ping_times[4]}"
-      fd.print "\t#{max}\t0\t0\t0\t0\t0\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-    when 2
-      fd.print "#{datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{@ping_times[2]}\t#{@ping_times[2]}\t#{@ping_times[3]}\t#{@ping_times[4]}\t#{@ping_times[4]}"
-      fd.print "\t0\t#{max}\t0\t0\t0\t0\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-    when 3
-      fd.print "#{datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{@ping_times[3]}\t#{@ping_times[3]}\t#{(@ping_times[3] + @ping_times[4]) / 2}\t#{@ping_times[4]}\t#{@ping_times[4]}"
-      fd.print "\t0\t0\t#{max}\t0\t0\t#0\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-    when 4
-      fd.print "#{datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{@ping_times[4]}\t#{@ping_times[4]}\t#{@ping_times[4]}\t#{@ping_times[4]}\t#{@ping_times[4]}"
-      fd.print "\t0\t0\t0\t#{max}\t0\t0\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-    when 5 # Lost all pings.
-      fd.print "#{datetime.strftime('%Y-%m-%d %H:%M:%S')}\t-\t-\t-\t-\t-"
-      fd.print "\t0\t0\t0\t0\t#{max}"
-      fd.print "\t0\t0\t#{@average}\n" # 5 0's in failure columns, no_data -> max, last 0 is a reference for graphing.
-    end
-  end
-
-  def print_row(fd, datetime, max = 1)
-    if datetime < @datetime
-      Ping_Record.print_no_data(fd, datetime, max)
-      return -1
-    elsif datetime == @datetime
-      # Output 2 rows, one either side of the ping, so we remove mountain peaks from line graph.
-      print_row_body(fd, datetime - 30, max) # Start of date range this ping covers.
-      print_row_body(fd, datetime + 29, max) # End of date range this ping covers.
-      return 0
-
-    else # This shouldn't be able to happen.
-      Ping_Record.print_no_data(fd, datetime, max)
-      return 1
-    end
-  end
-end
-
+# Retired Gnuplot version of Ping.
 class Ping
   attr_accessor :hosts, :datetime
 
@@ -117,21 +28,21 @@ class Ping
 
   def self.graph_clients(mysql_conf, dist_host, start_time, end_time)
     images = ''
-    if (my = Mysql.new(mysql_conf.host, mysql_conf.dbuser, mysql_conf.key, mysql_conf.db)) != nil
-      res = my.query('select customer.site_name as wikk from distribution, customer, customer_distribution ' +
-                     " where distribution.site_name = '#{dist_host}' and distribution.distribution_id = customer_distribution.distribution_id " +
-                     ' and customer_distribution.customer_id = customer.customer_id order by wikk'
-                    )
-      if res != nil
-        res.each do |row|
-          ping_record = Ping.new(mysql_conf)
-          if (error = ping_record.gnuplot(row[0], start_time, end_time) ).nil?
-            images << "<img src=\"/#{NETSTAT_DIR}/#{row[0]}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
-          end
+    WIKK::SQL.connect(@mysql_conf) do |_sql|
+      query = <<~SQL
+        SELECT customer.site_name AS wikk
+        FROM distribution, customer, customer_distribution
+        WHERE distribution.site_name = '#{dist_host}'
+        AND distribution.distribution_id = customer_distribution.distribution_id
+        AND customer_distribution.customer_id = customer.customer_id
+        ORDER BY wikk
+      SQL
+      res.each_hash(query) do |row|
+        ping_record = Ping.new(mysql_conf)
+        if ping_record.gnuplot(row['site_name'], start_time, end_time).nil?
+          images << "<img src=\"/#{NETSTAT_DIR}/#{row[0]}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
         end
-        res.free
       end
-      my.close
     end
     return images
   end
@@ -157,7 +68,7 @@ class Ping
         if words && words[0] != 'ICMP' && words[1] == ':' # Lines that have ping responses have : there.
           update_pingrecord(words[0], words[2, 6])
         end
-      rescue Exception => e
+      rescue StandardError => e
         # @log.err("#{time} : #{words.join(',')} " + error)
       end
     end
@@ -190,8 +101,8 @@ class Ping
   def sql_ping_values(ping_id)
     return '' if @ping_records.length == 0
 
-    pr = @ping_records[0]
-    value_str = "(#{ping_id}, '#{@datetime_str}', '#{pr.host}', '#{pr.pingable_to_s}', #{pr.ping_times[0]}, #{pr.ping_times[1]}, #{pr.ping_times[2]}, #{pr.ping_times[3]}, #{pr.ping_times[4]})"
+    pr1 = @ping_records[0]
+    value_str = "(#{ping_id}, '#{@datetime_str}', '#{pr1.host}', '#{pr1.pingable_to_s}', #{pr1.ping_times[0]}, #{pr1.ping_times[1]}, #{pr1.ping_times[2]}, #{pr1.ping_times[3]}, #{pr1.ping_times[4]})"
 
     @ping_records[1..-1].each do |pr|
       value_str << ", (#{ping_id}, '#{@datetime_str}', '#{pr.host}', '#{pr.pingable_to_s}', #{pr.ping_times[0]}, #{pr.ping_times[1]}, #{pr.ping_times[2]}, #{pr.ping_times[3]}, #{pr.ping_times[4]})"
@@ -201,66 +112,54 @@ class Ping
   end
 
   def sql_record_of_ping_results
-    begin
-      if (my = Mysql.new(@mysql_conf.host, @mysql_conf.dbuser, @mysql_conf.key, @mysql_conf.db)) != nil
-        # puts my.class
-        # p @mysql_conf
-        my.query('START TRANSACTION WITH CONSISTENT SNAPSHOT')  # Replace with transaction block.
+    WIKK::SQL.connect(@mysql_conf) do |sql|
+      sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
         if @ping_records.length > 0
-          my.query("SELECT sequence_nextval('ping_log.ping_id')") do |res|
-            res.each do |row|
-              @ping_id = row[0].to_i
-            end
+          query = <<~SQL
+            SELECT sequence_nextval('ping_log.ping_id') AS seq
+          SQL
+          res.each_hash(query) do |row|
+            @ping_id = row['seq'].to_i
           end
 
-          my.query("UPDATE ping_index  SET ping_id = #{@ping_id}, last_ping = '#{@datetime_str}'")
-          my.query("DELETE FROM pinglog  WHERE ping_id = #{@ping_id}")
-          my.query("INSERT INTO pinglog (ping_id, ping_time, host_name, ping, time1, time2, time3, time4, time5) VALUES #{sql_ping_values(@ping_id)}")
+          sql.query <<~SQL
+            UPDATE ping_index SET ping_id = #{@ping_id}, last_ping = '#{@datetime_str}'"
+          SQL
+          sql.query <<~SQL
+            DELETE FROM pinglog WHERE ping_id = #{@ping_id}"
+          SQL
+          sql.query <<~SQL
+            INSERT INTO pinglog (ping_id, ping_time, host_name, ping, time1, time2, time3, time4, time5)
+            VALUES #{sql_ping_values(@ping_id)}"
+          SQL
         end
-        my.query('COMMIT')
-      end
-    rescue Exception => e
-      if my != nil
-        my.query('ROLLBACK')
-        # @log.err("#{time} :  #{error}")
-      end
-      puts e
-    ensure
-      if my != nil
-        my.close
       end
     end
   end
 
   def get_hosts_pings(host, start_time, end_time)
-    begin
-      if (my = Mysql.new(@mysql_conf.host, @mysql_conf.dbuser, @mysql_conf.key, @mysql_conf.db)) != nil
+    WIKK::SQL.connect(@mysql_conf) do |sql|
+      @ping_max = 1 # default graph would then be y [0..15], even if max ping response is less
+      @ping_records = []
 
-        my.query('START TRANSACTION WITH CONSISTENT SNAPSHOT')
-
-        @ping_max = 1 # default graph would then be y [0..15], even if max ping response is less
-        @ping_records = []
-
-        # Fetch the ping records from the DB and process them.
-        my.query("select  ping_time, ping, time1, time2, time3, time4, time5 from pinglog where host_name = '#{host}' and ping_time >= '#{start_time.strftime('%Y-%m-%d %H:%M:%S')}' and ping_time <= '#{end_time.strftime('%Y-%m-%d %H:%M:%S')}' order by ping_time") do |res|
-          res.each do |row|
-            begin
-              times = row[2..6].collect { |x| x.to_f }
-              @ping_records << Ping_Record.new(host, row[1] == 'T', times, Time.parse(row[0]) )
-              times.each { |r| @ping_max = r if r > @ping_max }
-            rescue Exception => e
-            end
-          end
+      # Fetch the ping records from the DB and process them.
+      query = <<~SQL
+        SELECT  ping_time, ping, time1, time2, time3, time4, time5
+        FROM pinglog
+        WHERE host_name = '#{host}'
+        AND ping_time >= '#{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
+        AND ping_time <= '#{end_time.strftime('%Y-%m-%d %H:%M:%S')}'
+        ORDER BY ping_time
+      SQL
+      sql.each_row(query) do |row|
+        begin
+          times = row[2..6].collect(& :to_f )
+          tm = row[0].is_a?( String ) ? Time.parse(row[0]) : row[0]
+          @ping_records << Ping_Record.new(host, row[1] == 'T', times, tm )
+          times.each { |r| @ping_max = r if r > @ping_max }
+        rescue StandardError => _e
+          # Ignore individual host errors
         end
-
-        my.query('COMMIT')
-      end
-    rescue Exception => e
-      my.query('ROLLBACK') if my != nil
-      # @log.err("#{Time.now} :  #{error}")
-    ensure
-      if my != nil
-        my.close
       end
     end
   end
@@ -324,7 +223,7 @@ class Ping
           TmpFileMod::TmpFile.exec(GNUPLOT, temp_filename_plot )
         end
       end
-    rescue Exception => e
+    rescue StandardError => e
       backtrace = error.backtrace[0].split(':')
       message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'').gsub(/\n/, ' ')}"
       return message

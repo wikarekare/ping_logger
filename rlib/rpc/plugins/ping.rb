@@ -30,7 +30,7 @@ class Pings < RPC
     rows = []
     WIKK::SQL.connect(@db_config) do |sql|
       sql.each_hash(query) do |row|
-        ping_time = Time.parse(row['ping_time'])
+        ping_time = row['ping_time'].is_a?( String ) ? Time.parse(row['ping_time']) : row['ping_time']
         time_range(start_time: last_time, end_time: ping_time, step: 60) do |t|
           rows << { 'ping_time' => t.strftime('%Y-%m-%d %H:%M:00'), 'times' => [] }
         end
