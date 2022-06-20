@@ -115,12 +115,10 @@ class Ping
     WIKK::SQL.connect(@mysql_conf) do |sql|
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
         if @ping_records.length > 0
-          query = <<~SQL
+          res = sql.query_hash = <<~SQL
             SELECT sequence_nextval('ping_log.ping_id') AS seq
           SQL
-          sql.each_hash(query) do |row|
-            @ping_id = row['seq'].to_i
-          end
+          @ping_id = res.first['seq'].to_i
 
           sql.query <<~SQL
             UPDATE ping_index SET ping_id = #{@ping_id}, last_ping = '#{@datetime_str}'"
