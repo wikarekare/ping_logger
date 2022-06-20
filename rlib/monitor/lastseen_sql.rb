@@ -2,42 +2,66 @@
 require 'time'
 require 'rubygems'
 require 'mysql'
-require_relative 'host_cluster.rb'
+# require_relative 'host_cluster.rb' # Start of cleanup
+
 
 # Last time we recorded a successful ping for a host
 class Lastseen
   # Multiple lines. Each a key\tdate time pair.
 
-  JITTER = 30 # We expect small variations
-  ORANGE_LIMIT = 60 + JITTER # Orange if not seen for a minute. The 30s allows for jitter.
-  RED_LIMIT = 150 + ORANGE_LIMIT # seconds, i.e. 2.5 minutes beyond the ORANGE LIMIT.
-  STATES =  { ok: 1, warning: 2, critical: 3, no_data_warning: 4, no_data_critical: 5, unknown: 6 }
+  ORANGE_LIMIT = 300 # seconds, i.e. 5 minutes.
+  DATETIME_LIMIT = 150 # seconds, We expect the 'datetime' timestamp to be updated each minute. The 30s allows for jitter.
+  STATES = { ok: 1, warning: 2, critical: 3, no_data_warning: 4, no_data_critical: 5, unknown: 6 }
 
   attr_reader :datetime, :clusters
 
-  # Initialize the class, fetching the DB
-  # @param db_conf [Hash] DB connection details
-  # @param with_clusters [Boolean] fetch last pings, grouped by cluster. Defaults to true.
-  def initialize(db_conf, with_clusters = true)
+  def initialize(db_conf)
     @mysql_conf = db_conf
     sync
-    @clusters = with_clusters ? Host_Cluster.new(db_conf).clusters : {}
   end
 
-  def sync(_with_clusters = true)
+  def sync
     @hosts = {}
+    @clusters = {}
     @now = Time.now
-    WIKK::SQL.connect(@mysql_conf) do |sql|
-      # there will be one row with a dummy host name called 'datetime', which is the last time we recorded a ping time in the table.
-      sql.each_hash("SELECT ping_time FROM lastping WHERE hostname = 'datetime'") do |row|
-        @datetime = Time.parse(row['ping_time'])
-      end
-      @datetime ||= @now # If there never has been a recorded ping, then default to the current time.
+    @now -= @now.sec + @now.usec / 1_000_000.0 # just want this to the minute!
+    @datetime = nil
 
-      # puts "Getting hosts and ping times from DB"
-      # load the ping timestamps as at the time of the creation of the class.
-      sql.each_hash("SELECT hostname, ping_time FROM lastping WHERE hostname != 'datetime' ORDER BY hostname") do |row|
-        @hosts[row['hostname']] = row['ping_time'].nil? ? nil : Time.parse(row['ping_time'])
+    WIKK::SQL.connect(@mysql_conf) do |sql|
+
+      # there will be one row with a dummy host name called 'datetime', which is the last time we recorded a ping time in the table.
+      query = <<~SQL
+        SELECT hostname, ping_time
+        FROM lastping
+        ORDER BY hostname
+      SQL
+
+    # puts "Getting hosts and ping times from DB"
+    # load the ping timestamps as at the time of the creation of the class.
+      sql.each_hash(query) do |row|
+        if row['hostname'] == 'datetime'
+          @datetime = Time.parse(row['ping_time']) unless row['ping_time'].nil?
+        else
+          @hosts[row['hostname']] = row['ping_time'].nil? ? nil : Time.parse(row['ping_time'])
+        end
+      end
+
+      @datetime ||= @now
+
+      cluster_query = <<~SQL
+        SELECT concat(distribution.site_name,' clients') AS cluster, customer.site_name
+        FROM distribution LEFT JOIN customer_distribution USING (distribution_id)
+        LEFT JOIN customer using (customer_id)
+        WHERE distribution.active = 1
+        ORDER BY distribution.site_name, customer.site_name
+      SQL
+
+      # puts "Getting customer list from DB"
+      # get the list of distribution sites and the clients site names that connect through them.
+      sql.each_hash(cluster_query) do |row|
+        @clusters[row['cluster'].capitalize] ||= []
+        # cluster exists, so add row to cluster
+        @clusters[row['cluster'].capitalize] << row['site_name'] unless row['site_name'].nil?
       end
     end
   end
@@ -59,21 +83,21 @@ class Lastseen
   def to_s
     s = "datetime\t#{@datetime} (#{@now})\n"
     @hosts.each do |host, datetime|
-      s += "#{host}\t#{datetime.nil? ? '0000-00-00 00:00:00' : datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{host_color(host)}\n"
+      s += "#{host}\t#{datetime.nil? ? '0000-00-00 00:00:00' : datetime.strftime('%Y-%m-%d %H:%M:%S')}\t#{host_colour(host)}\n"
     end
     return s
   end
 
-  # Have we successfully recorded a ping for any host within the RED_LIMIT
-  # @return [Boolean] True if last recorded ping for any host is more than ORANGE_LIMIT seconds plus normal jitter
+  # We haven't recorded any pings for a long while, for any host
+  # The timestamp of the last ping cycle is older than the ORANGE_LIMIT + the Jitter we will allow.
   def red_datetime?
-    @now > @datetime + RED_LIMIT
+    @now > (@datetime + 2 * (DATETIME_LIMIT + ORANGE_LIMIT))
   end
 
-  # Have we successfully recorded a ping for any host within the ORANGE_LIMIT
-  # @return [Boolean] True if last recorded ping for any host is more than DATETIME_LIMIT seconds (normal jitter)
+  # We haven't recorded any pings for a while, for any host
+  # The timestamp of the last ping cycle is older than the Jitter we will allow but not yet RED.
   def orange_datetime?
-    @now > @datetime + ORANGE_LIMIT && !red_datetime?
+    (@now > (@datetime + 2 * DATETIME_LIMIT)) && !red_datetime?
   end
 
   # Have we pinged this host within the RED_LIMIT
@@ -127,7 +151,7 @@ class Lastseen
   # @param v2 [ENUM] second state
   # @return [ENUM] state with the greatest numerical value
   def worst_state(v1, v2)
-    STATES[v1] >= STATES[v2] ? v1 : v2
+    STATES[v1] > STATES[v2] ? v1 : v2
   end
 
   # Which state is better
@@ -135,13 +159,14 @@ class Lastseen
   # @param v2 [ENUM] second state
   # @return [ENUM] state with the lowest numerical value
   def best_state(v1, v2)
-    STATES[v1] <= STATES[v2] ? v1 : v2
+    STATES[v1] < STATES[v2] ? v1 : v2
   end
 
   # Cluster colour, for graphing the state of a cluster of hosts.
   # @param hosts [Array] hostnames of hosts in a cluster
-  # @return [String] colour representing the status of the cluster
-  def cluster_colour(hosts)
+  # @return [String] colour representing the status of the cluster  def cluster_colour(hosts)
+    return  state_colour(:unknown) if hosts.length == 0
+
     worst = :ok        # Start with great optimism
     best = :unknown    # We don't yet know the best state
 
@@ -152,6 +177,7 @@ class Lastseen
       best = best_state(best, this_host_state)
     end
 
+    # return state_colour(worst) if worst == :unknown
     return state_colour(best) if best == worst # all good or all bad.
 
     return state_colour(:warning) # some are good, some aren't
@@ -183,13 +209,14 @@ class Lastseen
 
   def self.record_pings(mysql_conf, hosts, datetime)
     WIKK::SQL.connect(mysql_conf) do |sql|
+
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
         hosts << 'datetime' # Add last ping reference marker
-        hosts.each do |_host|
+        hosts.each do |host|
           query = <<~SQL
             INSERT INTO lastping (hostname, ping_time)
-              VALUES ('datetime', '#{datetime.strftime('%Y-%m-%d %H:%M:%S')}')
-              ON DUPLICATE KEY UPDATE ping_time='#{datetime.strftime('%Y-%m-%d %H:%M:%S')}'
+            VALUES ('#{host}', '#{datetime.strftime('%Y-%m-%d %H:%M:%S')}')
+            ON DUPLICATE KEY UPDATE ping_time='#{datetime.strftime('%Y-%m-%d %H:%M:%S')}'
           SQL
           sql.query(query)
         end
@@ -211,9 +238,9 @@ class Lastseen
     return :unknown if @hosts[host].nil? # we don't have a ping recorded.
     return :no_data_critical if red_datetime? # haven't recorded any pings in quit a while.
     return :no_data_warning if orange_datetime? # haven't recorded any pings in a short while.
-    return :critical if seconds_diff(@hosts[host]) > RED_LIMIT
+    return :critical if seconds_diff(@hosts[host]) > ORANGE_LIMIT
     return :ok if seconds_diff(@hosts[host]) == 0 # should be exact as we timestamp the pings in batches.
-    return :warning if seconds_diff(@hosts[host]) <= RED_LIMIT
+    return :warning if seconds_diff(@hosts[host]) <= ORANGE_LIMIT
 
     return :unknown # shouldn't be able to get here.
   end
