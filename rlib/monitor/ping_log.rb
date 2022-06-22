@@ -130,7 +130,7 @@ class Ping_Log
   private def sql_record_of_ping_results
     WIKK::SQL.connect(@mysql_conf) do |sql|
       sql.transaction do
-        res = sql.query_hash = <<~SQL
+        res = sql.query_hash <<~SQL
           SELECT sequence_nextval('ping_log.ping_id') AS seq
         SQL
         @ping_id = res.first['seq'].to_i

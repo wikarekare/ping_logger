@@ -115,7 +115,7 @@ class Ping
     WIKK::SQL.connect(@mysql_conf) do |sql|
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
         if @ping_records.length > 0
-          res = sql.query_hash = <<~SQL
+          res = sql.query_hash <<~SQL
             SELECT sequence_nextval('ping_log.ping_id') AS seq
           SQL
           @ping_id = res.first['seq'].to_i
