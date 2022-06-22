@@ -1,4 +1,4 @@
-#!/usr/local/ruby3.0/bin/ruby
+#!/usr/local/bin/ruby
 require 'cgi'
 require 'wikk_web_auth'
 require 'wikk_configuration'
