@@ -3,7 +3,6 @@ require 'time'
 require 'rubygems'
 require 'wikk_sql'
 require 'wikk_configuration'       # Just for testing
-RLIB = '/wikk/rlib'
 require_relative "#{RLIB}/wikk_conf.rb" # Just for testing
 # require_relative 'host_cluster.rb' # Start of cleanup
 
