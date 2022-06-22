@@ -1,6 +1,6 @@
-# /usr/local/sbin/fping -C 1 -q wikk006
 require 'time'
 
+# Map db pinglog table
 class Pings < RPC
   def initialize(authenticated = false)
     super(authenticated)
@@ -21,11 +21,14 @@ class Pings < RPC
   end
 
   rmethod :read do |select_on: nil, set: nil, result: nil, order_by: nil, **_args|  # rubocop:disable Lint/UnusedBlockArgument"
-    query = <<-EOT
-      SELECT ping_time, time1, time2, time3, time4, time5 FROM pinglog
-      WHERE ping_time >= '#{select_on['start_time']}' and ping_time < '#{select_on['end_time']}' and host_name = '#{select_on['hostname']}'
+    query = <<-SQL
+      SELECT ping_time, time1, time2, time3, time4, time5
+      FROM pinglog
+      WHERE ping_time >= '#{select_on['start_time']}'
+      AND ping_time < '#{select_on['end_time']}'
+      AND host_name = '#{select_on['hostname']}'
       ORDER BY ping_time
-    EOT
+    SQL
     last_time = Time.parse(select_on['start_time'])
     rows = []
     WIKK::SQL.connect(@db_config) do |sql|
