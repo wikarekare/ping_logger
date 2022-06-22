@@ -1,6 +1,7 @@
 # /usr/local/sbin/fping -C 1 -q wikk006
 require 'open3'
 
+# fping a site
 class Host_ping < RPC
   def initialize(authenticated = false)
     super(authenticated)
