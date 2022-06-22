@@ -10,7 +10,7 @@ start_date=`date "+%Y-%m-%d %H:%M:00"`
 
 #Collect the pings and log into DB
 echo "fping: ${start_date} " $date
-${FPING} -t 250 -p 500 -C 5 -q -f  ${CONF_DIR}/hosts 2>&1 | ${SBIN_DIR}/monitor/load_ping_sql.rb $1 "${start_date}"
+${FPING} -t 250 -p 500 -C 5 -q -f  ${FPING_HOSTS} 2>&1 | ${SBIN_DIR}/monitor/load_ping_sql.rb $1 "${start_date}"
 
 # Collect switch port status, and record up as pingable in the lastseen table
 echo "snmp switch check: " $(date)
