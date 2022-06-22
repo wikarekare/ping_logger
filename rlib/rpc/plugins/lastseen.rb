@@ -1,4 +1,3 @@
-RLIB = '/wikk/rlib'
 require_relative "#{RLIB}/monitor/lastseen_sql.rb"
 
 # Map DB lastseen log
