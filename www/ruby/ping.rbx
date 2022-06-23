@@ -100,7 +100,7 @@ auth_needed = ( @form_on || @connections =~ /[PC][0-9]*/ )
 
 begin
   @authenticated = WIKK::Web_Auth.authenticated?(@cgi)
-rescue Exception => e
+rescue Exception => e # rubocop:disable Lint/RescueException
   @authenticated = false
 end
 
@@ -167,8 +167,9 @@ begin
   else
     @signal = []
   end
-rescue Exception => e
-  message = e.message
+rescue Exception => e # rubocop:disable Lint/RescueException
+  backtrace = e.backtrace[0].split(':')
+  message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
 end
 
 if @graphtype == 'grapht' # is @graphtype grapht
@@ -369,8 +370,9 @@ if @no_traffic != 'true' || @traffic.length > 0
     else
       images = Graph_2D.new(@mysql_conf, @hosts[0], split_in_out, Time.at(start), Time.at(end_time) ).images
     end
-  rescue Exception => e
-    message << e.to_s
+  rescue Exception => e # rubocop:disable Lint/RescueException
+    backtrace = e.backtrace[0].split(':')
+    message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
   end
   if @traffic.length > 0
     @hosts = @hold
@@ -418,8 +420,9 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
               end
               host_list << "<input type=\"hidden\" name=\"host\" value=\"#{h}\" id=\"host\">\n"
             end
-          rescue Exception => e
-            message << e.message
+          rescue Exception => e # rubocop:disable Lint/RescueException
+            backtrace = e.backtrace[0].split(':')
+            message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
             host_list = ''
           end
           begin
@@ -433,8 +436,9 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
               end
               signal_list << "<input type=\"hidden\" name=\"signal\" value=\"#{h}\" id=\"signal\">\n"
             end
-          rescue Exception => e
-            message << e.message
+          rescue Exception => e # rubocop:disable Lint/RescueException
+            backtrace = e.backtrace[0].split(':')
+            message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
             signal_list = ''
           end
           "\n<!-- Graph failed with message: #{message}  -->\n" +
