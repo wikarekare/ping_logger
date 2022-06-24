@@ -3,7 +3,7 @@ require 'cgi'
 require 'wikk_web_auth'
 require 'wikk_configuration'
 
-RLIB = '/wikk/rlib'
+RLIB = '/wikk/rlib' unless defined? RLIB
 require_relative "#{RLIB}/wikk_conf.rb"
 require "#{RLIB}/monitor/lastseen_sql.rb"
 require "#{RLIB}/monitor/pinglog.rb"

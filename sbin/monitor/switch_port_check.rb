@@ -4,7 +4,7 @@
 require 'snmp'
 require 'time'
 require 'wikk_configuration'
-RLIB = '/wikk/rlib'
+RLIB = '/wikk/rlib' unless defined? RLIB
 require_relative "#{RLIB}/wikk_conf.rb"
 require_relative "#{RLIB}/monitor/lastseen_sql.rb"
 require_relative "#{RLIB}/utility/snmp_override.rb"
