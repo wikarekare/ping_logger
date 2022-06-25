@@ -23,8 +23,8 @@ class Graph_Ping_Log < Ping_Log
         ORDER BY wikk
       SQL
       sql.each_hash(query) do |row|
-        ping_record = Ping_Log.new(mysql_conf)
-        if (_error = ping_record.gnuplot(row['site_name'], start_time, end_time) ).nil?
+        ping_log = Ping_Log.new(mysql_conf)
+        if (_error = ping_log.gnuplot(row['site_name'], start_time, end_time) ).nil?
           images << "<img src=\"/#{NETSTAT_DIR}/#{row['site_name']}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
         end
       end
