@@ -57,7 +57,7 @@ var wikk_ping = ( function() {
 
     var the_form = document.getElementById('expanded_form');
     var args = {
-      "method": "Graph.graph",
+      "method": "GnuGraph.graph",
       "kwparams": {
         "select_on": { "hosts": hosts,
                        "start_time": the_form.start_datetime.value,
