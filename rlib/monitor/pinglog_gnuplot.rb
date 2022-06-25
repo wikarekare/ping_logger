@@ -1,13 +1,13 @@
 require 'syslog'
 require 'rubygems'
-require 'mysql'
+require 'wikk_sql'
 require 'tmpfile'
 require 'time'
 require_relative 'lastseen_sql.rb'
 require_relative 'ping_record.rb'
 
 # Retired Gnuplot version of Ping.
-class Ping
+class Ping_Log
   attr_accessor :hosts, :datetime
 
   def initialize(db_conf, datetime = nil)
@@ -38,9 +38,9 @@ class Ping
         ORDER BY wikk
       SQL
       sql.each_hash(query) do |row|
-        ping_record = Ping.new(mysql_conf)
+        ping_record = Ping_Log.new(mysql_conf)
         if ping_record.gnuplot(row['site_name'], start_time, end_time).nil?
-          images << "<img src=\"/#{NETSTAT_DIR}/#{row[0]}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
+          images << "<img src=\"/#{NETSTAT_DIR}/#{row['site_name']}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
         end
       end
     end
@@ -198,22 +198,22 @@ class Ping
 
           txt_fd.flush  # ensure disk copy has been written.
 
-          plot_fd.print <<-EOF
-   set terminal png truecolor size 450,200 small
-   set title 'Ping response in ms from #{host}'
-   set nokey
-   set timefmt "%Y-%m-%d %H:%M:%S"
-   set datafile separator '\\t'
-   set xdata time
-   set format x "%H:%M\\n%m/%d"
-   #set xlabel 'Time'
-   set xtics border out nomirror autofreq
-   set xrange ["#{start_time.strftime('%Y-%m-%d %H:%M:%S')}":"#{end_time.strftime('%Y-%m-%d %H:%M:%S')}"]
-   set ylabel 'Pings ms'
-   set yrange [0:#{@ping_max}]
-   set output '#{WWW_DIR}/#{NETSTAT_DIR}/#{host}-p5f.png'
-   set datafile missing '-'
-   plot "#{temp_filename_txt}" u 1:7:13 w filledcu lc rgbcolor "#ccffff", "" u 1:8:13 w filledcu lc rgbcolor "#99ffff", "" u 1:9:13 w filledcu lc rgbcolor "#4dffff", "" u 1:10:13 w filledcu lc rgbcolor "#00ffff", "" u 1:2:3 w filledcu lc rgbcolor "#eceeff", "" u 1:3:4 w filledcu lc rgbcolor "#ccccff", "" u 1:4:5 w filledcu lc rgbcolor "#ccccff", ""  u 1:5:6 w filledcu lc rgbcolor "#eceeff", "" u 1:4 w lines lc rgbcolor "#000000", "" u 1:14 w lines lc rgbcolor "#00ff00", "" u 1:11:13 w filledcu lc rgbcolor "#ff4455", "" u 1:13:12 w filledcu lc rgbcolor "#ffff88"
+          plot_fd.print <<~EOF
+            set terminal png truecolor size 450,200 small
+            set title 'Ping response in ms from #{host}'
+            set nokey
+            set timefmt "%Y-%m-%d %H:%M:%S"
+            set datafile separator '\\t'
+            set xdata time
+            set format x "%H:%M\\n%m/%d"
+            #set xlabel 'Time'
+            set xtics border out nomirror autofreq
+            set xrange ["#{start_time.strftime('%Y-%m-%d %H:%M:%S')}":"#{end_time.strftime('%Y-%m-%d %H:%M:%S')}"]
+            set ylabel 'Pings ms'
+            set yrange [0:#{@ping_max}]
+            set output '#{WWW_DIR}/#{NETSTAT_DIR}/#{host}-p5f.png'
+            set datafile missing '-'
+            plot "#{temp_filename_txt}" u 1:7:13 w filledcu lc rgbcolor "#ccffff", "" u 1:8:13 w filledcu lc rgbcolor "#99ffff", "" u 1:9:13 w filledcu lc rgbcolor "#4dffff", "" u 1:10:13 w filledcu lc rgbcolor "#00ffff", "" u 1:2:3 w filledcu lc rgbcolor "#eceeff", "" u 1:3:4 w filledcu lc rgbcolor "#ccccff", "" u 1:4:5 w filledcu lc rgbcolor "#ccccff", ""  u 1:5:6 w filledcu lc rgbcolor "#eceeff", "" u 1:4 w lines lc rgbcolor "#000000", "" u 1:14 w lines lc rgbcolor "#00ff00", "" u 1:11:13 w filledcu lc rgbcolor "#ff4455", "" u 1:13:12 w filledcu lc rgbcolor "#ffff88"
           EOF
 
           plot_fd.flush  # ensure disk copy has been written.
