@@ -6,7 +6,7 @@ require 'wikk_configuration'
 RLIB = '/wikk/rlib' unless defined? RLIB
 require_relative "#{RLIB}/wikk_conf.rb"
 require "#{RLIB}/monitor/lastseen_sql.rb"
-require "#{RLIB}/monitor/pinglog.rb"
+require "#{RLIB}/monitor/ping_log.rb"
 require "#{RLIB}/monitor/signal_log_new.rb"
 require "#{RLIB}/account/graph_sql_traffic.rb"
 
@@ -413,7 +413,7 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
             host_list = ''
             @hosts.each do |h|
               if @no_ping != 'true'
-                ping_record = Ping.new(@mysql_conf)
+                ping_record = Ping_Log.new(@mysql_conf)
                 if (error = ping_record.gnuplot(h, Time.at(start), Time.at(end_time)) ).nil?
                   images << "<p><img src=\"/#{NETSTAT_DIR}/#{h}-p5f.png\"></p>\n"
                 end
