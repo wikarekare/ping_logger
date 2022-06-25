@@ -4,6 +4,7 @@
 # require "syslog"
 require 'wikk_sql'
 require 'time'
+require 'tmpfile'
 
 require_relative 'ping_record.rb'
 require_relative 'lastseen_sql.rb'
@@ -31,6 +32,95 @@ class Ping_Log
 
     @pingable_hosts = [] # Array of hostname we could ping.
     @ping_records = [] # Array of all ping results.
+    @ping_max = 0
+  end
+
+  def self.graph_clients(mysql_conf, dist_host, start_time, end_time)
+    images = ''
+    WIKK::SQL.connect(mysql_conf) do |sql|
+      query = <<~SQL
+        select customer.site_name as wikk
+        from distribution, customer, customer_distribution
+        where distribution.site_name = '#{dist_host}'
+        and distribution.distribution_id = customer_distribution.distribution_id
+        and customer_distribution.customer_id = customer.customer_id
+        order by wikk
+      SQL
+      sql.each_hash(query) do |row|
+        ping_record = self.new(mysql_conf)
+        if ping_record.gnuplot(row['site_name'], start_time, end_time).nil?
+          images << "<img src=\"/#{NETSTAT_DIR}/#{row['site_name']}-p5f.png?start_time=#{start_time.xmlschema}&end_time=#{end_time.xmlschema}\">\n"
+        end
+      end
+    end
+    return images
+  end
+
+  def gnuplot(host, start_time, end_time)
+    start_time -= start_time.sec + start_time.usec / 1000000.0
+    end_time -= end_time.sec + end_time.usec / 1000000.0
+    begin
+      temp_filename_txt = "#{TMP_PLOT_DIR}/#{host}-pings.txt"
+      temp_filename_plot = "#{TMP_PLOT_DIR}/#{host}-pings.plot"
+
+      TmpFileMod::TmpFile.open(temp_filename_plot, 'w') do |plot_fd|
+        plot_fd.no_unlink
+        TmpFileMod::TmpFile.open(temp_filename_txt, 'w') do |txt_fd|
+          txt_fd.no_unlink
+          txt_fd.puts "# #{host} #{start_time.strftime('%Y-%m-%d %H:%M:%S')} #{end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+          @ping_max, @ping_records = get_hosts_pings(host, start_time, end_time) # sets up the ping records from DB records.
+          t = start_time
+          i = 0
+          while t <= end_time
+            if i < @ping_records.length
+              case @ping_records[i].print_row(txt_fd, t, @ping_max)
+              when 0 # this is the same datetime
+                i += 1 # move onto next record and increment the time
+                t += 60 # increment by a minute
+              when 1   # 1 => t >, which can happen if there are two identical ping records!
+                # move to the next record, but us the same time (i.e. try to catch up)
+                i += 1 # move onto next record
+              when -1	#-1 => t < record datetime
+                # Stay on this record, but increment the time.
+                t += 60 # increment by a minute
+              end
+            else # we ran out of records to print, so are filling in with empty ones.
+              Ping_Record.print_no_data(txt_fd, t, @ping_max)
+              t += 60 # increment by a minute
+            end
+          end
+
+          txt_fd.flush  # ensure disk copy has been written.
+
+          plot_fd.print <<~EOF
+            set terminal png truecolor size 450,200 small
+            set title 'Ping response in ms from #{host}'
+            set nokey
+            set timefmt "%Y-%m-%d %H:%M:%S"
+            set datafile separator '\\t'
+            set xdata time
+            set format x "%H:%M\\n%m/%d"
+            #set xlabel 'Time'
+            set xtics border out nomirror autofreq
+            set xrange ["#{start_time.strftime('%Y-%m-%d %H:%M:%S')}":"#{end_time.strftime('%Y-%m-%d %H:%M:%S')}"]
+            set ylabel 'Pings ms'
+            set yrange [0:#{@ping_max}]
+            set output '#{WWW_DIR}/#{NETSTAT_DIR}/#{host}-p5f.png'
+            set datafile missing '-'
+            plot "#{temp_filename_txt}" u 1:7:13 w filledcu lc rgbcolor "#ccffff", "" u 1:8:13 w filledcu lc rgbcolor "#99ffff", "" u 1:9:13 w filledcu lc rgbcolor "#4dffff", "" u 1:10:13 w filledcu lc rgbcolor "#00ffff", "" u 1:2:3 w filledcu lc rgbcolor "#eceeff", "" u 1:3:4 w filledcu lc rgbcolor "#ccccff", "" u 1:4:5 w filledcu lc rgbcolor "#ccccff", ""  u 1:5:6 w filledcu lc rgbcolor "#eceeff", "" u 1:4 w lines lc rgbcolor "#000000", "" u 1:14 w lines lc rgbcolor "#00ff00", "" u 1:11:13 w filledcu lc rgbcolor "#ff4455", "" u 1:13:12 w filledcu lc rgbcolor "#ffff88"
+          EOF
+
+          plot_fd.flush  # ensure disk copy has been written.
+
+          TmpFileMod::TmpFile.exec(GNUPLOT, temp_filename_plot )
+        end
+      end
+    rescue Exception => e # rubocop:disable Lint/RescueException
+      backtrace = e.backtrace[0].split(':')
+      message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'').gsub(/\n/, ' ')}"
+      return message
+    end
+    return nil
   end
 
   # print date time and a tab separated list of hosts that we received a ping response from.
@@ -78,11 +168,11 @@ class Ping_Log
   # @param start_time [Time] want records from, and including this time
   # @param end_time [Time] want records up to, and including this time
   # @return [ping_max, Array] Longest ping, Array of Ping_Records.
-  def self.get_hosts_pings(mysql_conf, host, start_time, end_time)
+  def get_hosts_pings(host, start_time, end_time)
     ping_records = []
-    WIKK::SQL.connect(mysql_conf) do |sql|
+    ping_max = 1 # minimum value for longest ping, even if max ping response is less. Used for graph generation, to have a minimum y axis max value.
+    WIKK::SQL.connect(@mysql_conf) do |sql|
       sql.transaction do # doing this to ensure we have a consistent state in the Round Robin indexes.
-        ping_max = 1 # minimum value for longest ping, even if max ping response is less. Used for graph generation, to have a minimum y axis max value.
         query = <<~SQL
           SELECT ping_time, ping, time1, time2, time3, time4, time5
           FROM pinglog
@@ -104,6 +194,12 @@ class Ping_Log
       end
     end
     return ping_max, ping_records # Longest ping, Array of Ping_Records.
+  end
+
+  # Call get_hosts_pings without needing a Ping_Log instance
+  def self.get_hosts_pings(mysql_conf, host, start_time, end_time)
+    pl = self.new(mysql_conf)
+    return pl.get_host_pings(host, start_time, end_time)
   end
 
   # Record a parsed fping line. (parsed by parse())
