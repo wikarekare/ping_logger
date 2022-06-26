@@ -1,0 +1,75 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+  <TITLE>Site Pings</TITLE>
+  <!-- MIT License Wikarekare.org rob@wikarekare.org -->
+
+  <script src="/js/RGraph/libraries/RGraph.svg.common.core.js"></script>
+  <script src="/js/RGraph/libraries/RGraph.svg.line.js"></script>
+  <script src="/js/RGraph/libraries/RGraph.svg.bar.js"></script>
+   <script src="/js/RGraph/libraries/RGraph.svg.common.key.js"></script>
+
+  <script src="/js/jquery-3.0.0.min.js"></script>
+  <script src="/js/wikk_ajax-min.js"></script>
+  <script src="/js/wikk_web_auth-min.js"></script>
+  <script src="/js/wikk_params.js"></script>
+  <script src="/js/wikk_ping_data.js"></script>
+  <script src="/js/wikk_ping_buckets.js"></script>
+  <script src="/js/wikk_ping_form.js"></script>
+  <script src="/js/wikk_ping_graph.js"></script>
+  <script src="/js/wikk_ping_freq_graph.js"></script>
+  <script src="/js/last_seen_comms.js"></script>
+
+  <script type="text/javascript">
+
+      function init() {
+        delay_sending = false;
+        simple_form = false;
+
+        var params = wikk_params.getURLParameters();
+        var start_time = wikk_params.get_argv('start_time');
+        var end_time = wikk_params.get_argv('end_time');
+        var hostname = wikk_params.get_argv('host');
+
+        wikk_ping_freq_graph.init('cc_freq');
+        wikk_ping_form.init('ping_form', 'cc_ping', hostname, start_time, end_time );
+      }
+
+  </script>
+  <META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+  <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+</HEAD>
+<BODY onload="init();">
+  <div style="padding-left: 0px">
+    <form id='ping_form'>
+      <table>
+        <tr>
+          <td style="text-align: left;">
+            Host <input type="text" id="host" style="width: 125px; padding: 5px" size="19" value="cop01-p">
+            Start <input type="text" id="start_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            End Date-time <input type="text" id="end_datetime" style="width: 125px; padding: 5px" size="19" value="0000-00-00 00:00:00">
+            <BUTTON type="submit" id="draw" onClick="wikk_ping_form.post_form();this.blur();return false">Draw</BUTTON>
+          </td>
+          <td style="text-align: right; float:right;" id="datetime">0000-00-00 00:00:00</td>
+        </tr>
+        <tr>
+          <td style="text-align:left;">
+            Days <input type="text" name="days" value="0" id="days" size="5" onChange="wikk_ping_form.set_last_period();this.blur();return false">
+            Hours <input type="text" name="hours" value="1.0" id="hours" size="4" onChange="wikk_ping_form.set_last_period();this.blur();return false">
+            <BUTTON type="submit" id="endnow" onClick="wikk_ping_form.set_last_period();this.blur();return false">Set Start to Now - Period</BUTTON>
+            <BUTTON type="submit" id="set_endtime" onClick="wikk_ping_form.set_offset_period(0);this.blur();return false">Set End Date to Start + Period</BUTTON>
+            &nbsp;&nbsp;
+            <BUTTON type="submit" id="last_seen" onClick="wikk_ping_form.set_last_seen();this.blur();">Last Seen</BUTTON>
+          &nbsp;&nbsp;
+            <BUTTON type="submit" id="prev_period" onClick="wikk_ping_form.set_offset_period(-1);this.blur();return false"> &lt;&lt; </BUTTON>
+            <BUTTON type="submit" id="next_period" onClick="wikk_ping_form.set_offset_period(1);this.blur();return false"> &gt;&gt; </BUTTON>
+          </td>
+        </tr>
+      </table>
+    </form>
+  </div>
+  <div id="men_at_work"></div>
+  <div id="cc_ping" style="width: 720px; height: 405px"></div>
+  <div id="cc_freq" style="width: 720px; height: 405px"></div>
+</BODY>
+</HTML>
