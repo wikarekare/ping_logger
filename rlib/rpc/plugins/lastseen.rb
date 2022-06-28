@@ -1,3 +1,4 @@
+#  MIT License Wikarekare.org rob@wikarekare.org
 require_relative "#{RLIB}/monitor/lastseen_sql.rb"
 
 # Map DB lastseen log
