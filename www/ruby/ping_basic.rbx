@@ -90,6 +90,8 @@ def gen_images
   @message = []
 
   @hosts.each do |h|
+    next if h == ''
+
     @graph_type.each do |gt|
       begin
         case gt
