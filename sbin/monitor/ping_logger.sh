@@ -13,6 +13,8 @@ echo "fping: ${start_date} " $date
 ${FPING} -t 250 -p 500 -C 5 -q -f  ${FPING_HOSTS} 2>&1 | ${SBIN_DIR}/monitor/load_ping_sql.rb $1 "${start_date}"
 
 # Collect switch port status, and record up as pingable in the lastseen table
+# Relies on fping recording that each switch is pingable.
+# This stops snmp queries to unresponsive switch causing long delays.
 echo "snmp switch check: " $(date)
 /usr/bin/time ${SBIN_DIR}/monitor/switch_port_check.rb "${start_date}"
 echo "record: " $(date)
