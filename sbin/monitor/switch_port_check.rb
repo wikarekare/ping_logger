@@ -45,6 +45,24 @@ def check_switch(host_record:)
   end
 end
 
+# Should merge this into LastSeen, but will test it here
+# Get just the ping records for the hosts with a specific ping time
+# @param mysql_conf [Hash] DB configuration
+# @param ping_time [Time] Time we are looking for
+# @return hosts [Hash] key is hosts with that ping_time, value is true
+def cache_online(mysql_conf:, ping_time:)
+  query = <<~SQL
+    SELECT hostname FROM lastping WHERE ping_time = '#{ping_time}'
+  SQL
+  online = {}
+  WIKK::SQL.connect(mysql_conf) do |sql|
+    sql.each_hash(query) do |row|
+      online[row['hostname']] = true
+    end
+  end
+  return online
+end
+
 hosts = JSON.parse(File.read(SWITCH_CHECK_PORTS))
 
 @mysql_conf = WIKK::Configuration.new(MYSQL_CONF)
@@ -53,10 +71,14 @@ hosts = JSON.parse(File.read(SWITCH_CHECK_PORTS))
 t = ARGV.length == 1 ? Time.parse(ARGV[0]) : Time.now
 t -= t.sec + t.usec / 1000000.0 # just want this to the minute!
 
+online = cache_online(mysql_conf: @mysql_conf, ping_time: t)
+
 threads = []
 
 hosts.each do |h|
-  threads << Thread.new(h) { |hr| check_switch(host_record: hr) }
+  if online[h['hostname']]
+    threads << Thread.new(h) { |hr| check_switch(host_record: hr) }
+  end
 end
 
 threads.each(& :join)
