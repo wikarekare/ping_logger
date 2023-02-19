@@ -71,6 +71,7 @@ hosts = JSON.parse(File.read(SWITCH_CHECK_PORTS))
 t = ARGV.length == 1 ? Time.parse(ARGV[0]) : Time.now
 t -= t.sec + t.usec / 1000000.0 # just want this to the minute!
 
+# This relies on ping_logger.sh recording the host pings, before switch_port_check is run.
 online = cache_online(mysql_conf: @mysql_conf, ping_time: t)
 
 threads = []
