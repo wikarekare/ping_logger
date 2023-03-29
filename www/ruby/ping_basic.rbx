@@ -42,7 +42,7 @@ def cal_time_range
   elsif @start_date_time_str != nil && @start_date_time_str != ''
     begin
       @start_date_time = Time.parse(@start_date_time_str).to_i
-    rescue Exception => e # Ignore error and assume last hour
+    rescue Exception => _e # rubocop:disable Lint/RescueException Ignore error and assume last hour
       @start_date_time = Time.now.to_i - (@days * 86400 + @hours * 3600).to_i
     end
   else # Default to last hour
@@ -72,8 +72,9 @@ def process_graph_list
     # not sure why, but 0 length array causes silent exception in @cgi, but not if run from cli ruby
     @graph_type.collect! { |h| CGI.escapeHTML(h) }
     begin
-      @authenticated = WIKK::Web_Auth.authenticated?(@cgi)
-    rescue Exception => e
+      pstore_conf = JSON.parse(PSTORE_CONF)
+      @authenticated = WIKK::Web_Auth.authenticated?(@cgi, pstore_config: pstore_conf)
+    rescue Exception => _e # rubocop:disable Lint/RescueException
       @authenticated = false
     end
 
