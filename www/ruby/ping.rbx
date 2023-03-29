@@ -99,7 +99,7 @@ auth_needed = ( @form_on || @connections =~ /[PC][0-9]*/ )
 @dist = ( @dist_b == 'true' || @dist == 'true')
 
 begin
-  pstore_conf = JSON.parse(PSTORE_CONF)
+  pstore_conf = JSON.parse(File.read(PSTORE_CONF))
   @authenticated = WIKK::Web_Auth.authenticated?(@cgi, pstore_config: pstore_conf)
 rescue Exception => e # rubocop:disable Lint/RescueException
   @authenticated = false

@@ -72,7 +72,7 @@ def process_graph_list
     # not sure why, but 0 length array causes silent exception in @cgi, but not if run from cli ruby
     @graph_type.collect! { |h| CGI.escapeHTML(h) }
     begin
-      pstore_conf = JSON.parse(PSTORE_CONF)
+      pstore_conf = JSON.parse(File.read(PSTORE_CONF))
       @authenticated = WIKK::Web_Auth.authenticated?(@cgi, pstore_config: pstore_conf)
     rescue Exception => _e # rubocop:disable Lint/RescueException
       @authenticated = false
