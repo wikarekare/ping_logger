@@ -99,7 +99,8 @@ auth_needed = ( @form_on || @connections =~ /[PC][0-9]*/ )
 @dist = ( @dist_b == 'true' || @dist == 'true')
 
 begin
-  @authenticated = WIKK::Web_Auth.authenticated?(@cgi)
+  pstore_conf = JSON.parse(PSTORE_CONF)
+  @authenticated = WIKK::Web_Auth.authenticated?(@cgi, pstore_config: pstore_conf)
 rescue Exception => e # rubocop:disable Lint/RescueException
   @authenticated = false
 end
@@ -445,7 +446,7 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
             "<form name=\"traffic\" id=\"traffic\" method=\"get\" >\n" +
             '<div style="text-align: right; FONT-FAMILY:Arial ; font-size: 10px; margin-top:0; margin-left:0;">' +
             "<input type=\"hidden\" name=\"form_on\" value=\"#{@form_on == true ? 'on' : 'off'}\" id=\"form_on\">\n" +
-            "<a href=\"/ruby/login.rbx?#{@authenticated ? 'action=logout&' : ''}ReturnURL='#{CGI.escapeHTML(ENV['SCRIPT_NAME'] + encode)}'\"><img src=\"#{auth_image}\"/></a>" +
+            "<a href=\"/ruby/login.rbx?#{@authenticated ? 'action=logout&' : ''}ReturnURL='#{CGI.escapeHTML(ENV.fetch('SCRIPT_NAME', nil) + encode)}'\"><img src=\"#{auth_image}\"/></a>" +
             "<input type=\"image\" src=\"#{@form_on == true ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}\"  onclick=\"correct_form_on(this.form)\" />" +
 
             # "<a href=\"/ruby/ping.rbx?host=#{@hosts[0]}#{@form_on == true ? "&form=off" : "&form=on" }#{@dist ? '&@dist=true' : ''}#{@graphtype == "" ? "" : "&@graphtype=#{@graphtype}"}\" >\n" +
