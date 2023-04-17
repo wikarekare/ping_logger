@@ -5,8 +5,8 @@ require 'time'
 
 # Map db pinglog table
 class Pings < RPC
-  def initialize(authenticated = false)
-    super(authenticated)
+  def initialize(cgi, authenticated = false)
+    super(cgi, authenticated)
     @select_acl = [ 'hostname', 'start_time', 'end_time', 'tz' ]
     @set_acl = []
     @result_acl = [ 'hostname', 'rows', 'affected_rows', 'tz' ] # ignored for now.
