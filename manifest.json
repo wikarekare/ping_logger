@@ -1,0 +1,26 @@
+[
+  { "src": "rlib/",
+    "dst": "rlib",
+    "mode": "0644",
+    "user": "root",
+    "group": "root"
+  },
+  { "src": "sbin/",
+    "dst": "sbin",
+    "mode": "0755",
+    "user": "root",
+    "group": "root"
+  },
+  { "src": "www/wikarekare/",
+    "dst": "www/wikarekare",
+    "mode": "0644",
+    "user": "root",
+    "group": "root"
+  },
+  { "src": "www/ruby/",
+    "dst": "www/ruby",
+    "mode": "0644",
+    "user": "www",
+    "group": "www"
+  }
+]
