@@ -7,24 +7,21 @@ ${LOCKFILE} ${LOCK_PID_FILE} $$
 if [ $? != 0 ] ; then  exit 0 ; fi
 
 start_date=`date "+%Y-%m-%d %H:%M:00"`
+echo "Start run for time ${start_date}"
+
 
 #Collect the pings and log into DB
-echo "fping: ${start_date} " $date
+echo "fping: $(date)"
 ${FPING} -t 250 -p 500 -C 5 -q -f  ${FPING_HOSTS} 2>&1 | ${SBIN_DIR}/monitor/load_ping_sql.rb $1 "${start_date}"
 
-# Collect switch port status, and record up as pingable in the lastseen table
-# Relies on fping recording that each switch is pingable.
-# This stops snmp queries to unresponsive switch causing long delays.
-echo "snmp switch check: " $(date)
-/usr/bin/time ${SBIN_DIR}/monitor/switch_port_check.rb "${start_date}"
+# The snmp check only checks switches that the previous fping succeeded.
+# So must be after the fping. This stops long delays, waiting for switches that aren't online.
+echo "launch snmp_logger.sh"
+/wikk/sbin/monitor/snmp_logger.sh $1 "${start_date}" 2&>1 > ${TMP_DIR}/snmp_logger.out &
+
 echo "record: " $(date)
+${SBIN_DIR}/monitor/graph_host_status.rb
 
-
-#Graph the current network status and leave the resulting png on the web server.
-#${SBIN_DIR}/monitor/graph_net_status.rb | ${DOT} -Tcmapx -o ${STATUS_WWW_DIR}/bbstatusmap.html -Tpng -o ${STATUS_WWW_DIR}/bbstatus.png
-
-#${SBIN_DIR}/graph_host_status.rb $1
-/usr/bin/time ${SBIN_DIR}/monitor/graph_host_status.rb
-echo "finished: " $(date)
+echo "End Run: " $(date)
 
 rm -f ${LOCK_PID_FILE}
