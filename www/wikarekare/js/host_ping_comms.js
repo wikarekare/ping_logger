@@ -25,13 +25,14 @@ var wikk_host_ping = ( function() {
 
     var args = {
       "method": "Host_ping.read",
-      "kwparams": {
+      "params": {
         "select_on": { "hostname": site_name },  //every active line
         "orderby": null,
         "set": null,              //blank, then no fields to update in a GET
         "result": ['hostname', 'ms'] //defaults, and ignored
       },
-      "version": 1.1
+      "id": Date.getTime(),
+      "jsonrpc": 2.0
     }
 
     url = "/ruby/rpc.rbx"

@@ -24,7 +24,7 @@ var wikk_ping_graph = ( function() {
     var the_form = document.getElementById(form_id);
     var args = {
       "method": "Pings.read",
-      "kwparams": {
+      "params": {
         "select_on": { "hostname":   the_form.host.value,
                        "start_time": the_form.start_datetime.value,
                        "end_time":   the_form.end_datetime.value
@@ -33,7 +33,8 @@ var wikk_ping_graph = ( function() {
         "set": null,
         "result": []
       },
-      "version": 1.1
+      "id": Date.getTime(),
+      "jsonrpc": 2.0
     }
 
     url = "/ruby/rpc.rbx"

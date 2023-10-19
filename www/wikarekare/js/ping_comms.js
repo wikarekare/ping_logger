@@ -58,7 +58,7 @@ var wikk_ping = ( function() {
     var the_form = document.getElementById('expanded_form');
     var args = {
       "method": "GnuGraph.graph",
-      "kwparams": {
+      "params": {
         "select_on": { "hosts": hosts,
                        "start_time": the_form.start_datetime.value,
                        "end_time": the_form.end_datetime.value,
@@ -68,7 +68,8 @@ var wikk_ping = ( function() {
         "set": null,
         "result": graph_type
       },
-      "version": 1.1
+      "id": Date.getTime(),
+      "jsonrpc": 2.0
     }
 
     url = "/ruby/rpc.rbx"

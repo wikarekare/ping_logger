@@ -25,7 +25,7 @@ var wikk_ping_buckets = ( function() {
 
     var args = {
       "method": "Pings.buckets",
-      "kwparams": {
+      "params": {
         "select_on": { "hostname":   the_form.host.value,
                        "start_time": the_form.start_datetime.value,
                        "end_time":   the_form.end_datetime.value,
@@ -36,7 +36,8 @@ var wikk_ping_buckets = ( function() {
         "set": null,
         "result": []
       },
-      "version": 1.1
+      "id": Date.getTime(),
+      "jsonrpc": 2.0
     }
 
     url = "/cgi/rpc.rbx"

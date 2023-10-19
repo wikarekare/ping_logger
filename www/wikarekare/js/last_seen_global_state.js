@@ -25,13 +25,14 @@ var wikk_last_seen_global_state = ( function() {
 
     var args = {
       "method": "LastSeen.global_state",
-      "kwparams": {
+      "params": {
         "select_on": { },  //every active line
         "orderby": null,
         "set": null,              //blank, then no fields to update in a GET
         "result": ['hostname','colour']
       },
-      "version": 1.1
+      "id": Date.getTime(),
+      "jsonrpc": 2.0
     }
 
     url = "/ruby/rpc.rbx"
