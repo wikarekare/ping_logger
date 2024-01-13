@@ -35,7 +35,7 @@ var wikk_last_seen = ( function() {
       "jsonrpc": 2.0
     }
 
-    url = "/ruby/rpc.rbx"
+    url = RPC
     wikk_ajax.delayed_ajax_post_call(url, args, last_seen_callback, last_seen_error, last_seen_completion, 'json', true, delay);
     return false;
   }

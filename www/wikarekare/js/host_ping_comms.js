@@ -35,7 +35,7 @@ var wikk_host_ping = ( function() {
       "jsonrpc": 2.0
     }
 
-    url = "/ruby/rpc.rbx"
+    url = RPC
     wikk_ajax.delayed_ajax_post_call(url, args, host_ping_callback, host_ping_error, host_ping_completion, 'json', true, delay);
     return false;
   }
