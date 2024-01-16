@@ -31,11 +31,11 @@ var wikk_last_seen = ( function() {
         "set": null,              //blank, then no fields to update in a GET
         "result": ['hostname','ping_time']
       },
-      "id": Date.getTime(),
+      "id": new Date().getTime(),
       "jsonrpc": 2.0
     }
 
-    url = RPC
+    url = RPC_URL
     wikk_ajax.delayed_ajax_post_call(url, args, last_seen_callback, last_seen_error, last_seen_completion, 'json', true, delay);
     return false;
   }

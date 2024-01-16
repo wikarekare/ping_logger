@@ -68,11 +68,11 @@ var wikk_ping = ( function() {
         "set": null,
         "result": graph_type
       },
-      "id": Date.getTime(),
+      "id": new Date().getTime(),
       "jsonrpc": 2.0
     }
 
-    url = RPC
+    url = RPC_URL
     wikk_ajax.delayed_ajax_post_call(url, args, ping_form_callback, ping_form_error_callback, ping_form_completion, 'json', true, 0);
 
     return false;

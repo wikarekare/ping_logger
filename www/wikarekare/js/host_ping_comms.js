@@ -31,11 +31,11 @@ var wikk_host_ping = ( function() {
         "set": null,              //blank, then no fields to update in a GET
         "result": ['hostname', 'ms'] //defaults, and ignored
       },
-      "id": Date.getTime(),
+      "id": new Date().getTime(),
       "jsonrpc": 2.0
     }
 
-    url = RPC
+    url = RPC_URL
     wikk_ajax.delayed_ajax_post_call(url, args, host_ping_callback, host_ping_error, host_ping_completion, 'json', true, delay);
     return false;
   }

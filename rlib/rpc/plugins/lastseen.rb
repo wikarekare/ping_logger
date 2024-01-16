@@ -3,8 +3,8 @@ require_relative "#{RLIB}/monitor/lastseen_sql.rb"
 
 # Map DB lastseen log
 class LastSeen < RPC
-  def initialize(cgi, authenticated = false)
-    super(cgi, authenticated)
+  def initialize(cgi:, authenticated: false)
+    super(cgi: cgi, authenticated: authenticated)
     @select_acl = [ 'hostname' ]
     @result_acl = [ 'hostname', 'ping_time' ]
     @set_acl = if authenticated

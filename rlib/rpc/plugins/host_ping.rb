@@ -3,8 +3,8 @@ require 'open3'
 
 # fping a site
 class Host_ping < RPC
-  def initialize(cgi, authenticated = false)
-    super(cgi, authenticated)
+  def initialize(cgi:, authenticated: false)
+    super(cgi: cgi, authenticated: authenticated)
     @select_acl = [ 'hostname' ]
     @set_acl = []
     @result_acl = [ 'hostname', 'ms' ]
