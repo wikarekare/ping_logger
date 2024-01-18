@@ -14,6 +14,7 @@ start_date=$2
 # This stops snmp queries to unresponsive switch causing long delays.
 echo "snmp switch check: " $(date)
 ${SBIN_DIR}/monitor/switch_port_check.rb "${start_date}"
+${SBIN_DIR}/monitor/line_check.rb "${start_date}"
 echo "snmp finished: " $(date)
 
 rm -f ${LOCK_PID_FILE}
