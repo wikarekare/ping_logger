@@ -3,10 +3,11 @@
 # Producing: wikk021               : xmt/rcv/%loss = 5/5/0%, min/avg/max = 3.53/4.97/7.26
 #
 CONF_FILE = "#{ARGV[0]}"
-RLIB = '/wikk/rlib' unless defined? RLIB
 
 require 'wikk_configuration'
-require_relative "#{RLIB}/wikk_conf.rb"
+unless defined? WIKK_CONF
+  load '/wikk/etc/wikk.conf'
+end
 require_relative "#{RLIB}/monitor/ping_log.rb"
 
 @mysql_conf = WIKK::Configuration.new(MYSQL_CONF)

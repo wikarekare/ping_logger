@@ -3,8 +3,9 @@ require 'cgi'
 require 'wikk_web_auth'
 require 'wikk_configuration'
 
-RLIB = '/wikk/rlib' unless defined? RLIB
-require "#{RLIB}/wikk_conf.rb"
+unless defined? WIKK_CONF
+  load '/wikk/etc/wikk.conf'
+end
 require "#{RLIB}/monitor/lastseen_sql.rb"
 require "#{RLIB}/monitor/ping_log.rb"
 require "#{RLIB}/monitor/signal_log_new.rb"

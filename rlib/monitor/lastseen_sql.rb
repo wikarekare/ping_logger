@@ -3,8 +3,10 @@ require 'time'
 require 'rubygems'
 require 'wikk_sql'
 require 'wikk_configuration'       # Just for testing
-RLIB = '/wikk/rlib' unless defined? RLIB
-require_relative "#{RLIB}/wikk_conf.rb" # Just for testing
+
+unless defined? WIKK_CONF
+  load '/wikk/etc/wikk.conf'
+end # Just for testing
 # require_relative 'host_cluster.rb' # Start of cleanup
 
 # Last time we recorded a successful ping for a host

@@ -1,5 +1,7 @@
 #!/usr/local/bin/ruby
-load '/wikk/etc/wikk.conf'
+unless defined? WIKK_CONF
+  load '/wikk/etc/wikk.conf'
+end
 require 'wikk_sql'
 require 'wikk_configuration'
 require 'fileutils'
