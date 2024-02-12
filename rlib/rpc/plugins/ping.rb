@@ -12,11 +12,12 @@ class Pings < RPC
     @result_acl = [ 'hostname', 'rows', 'affected_rows', 'tz' ] # ignored for now.
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :create do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
     # new record
   end
 
-  rmethod :read do |select_on: nil, set: nil, result: nil, order_by: nil, **_args|  # rubocop:disable Lint/UnusedBlockArgument"
+  # Fetch ping logs for the host, between the given start and end times.
+  rmethod :read do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
     last_time = Time.parse(select_on['start_time'])
     end_time = Time.parse(select_on['end_time'])
     time_diff = end_time - last_time
@@ -32,7 +33,7 @@ class Pings < RPC
 
     tz = select_on['tz'].nil? ? '00:00' : select_on['tz'].strip
     tz = "+#{tz}" if tz =~ /^[0-9].*/
-    query = <<-SQL
+    query = <<~SQL
       SELECT date_format(CONVERT_TZ(ping_time, "+00:00", '#{tz}'), "#{time_format_str}") as event_time,
              MIN(time1) as t1,
              if(MIN(time2) = -1, -1, MIN(time2)) as t2,
@@ -70,18 +71,18 @@ class Pings < RPC
     return { 'rows' => [], 'affected_rows' => 0, 'hostname' => select_on['hostname'], 'tz' => tz }
   end
 
-  rmethod :update do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :update do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
     # We don't actually do this.
   end
 
-  rmethod :delete do |select_on: nil, set: nil, result: nil, **args|  # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :delete do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
     # We don't actually do this.
   end
 
   # Fetch ping logs for the host, between the given start and end times.
   # Selecting on hostname with like, between start_time and end_time
   # Returning frequency in nbuckets.
-  rmethod :buckets do |select_on: nil, set: nil, result: nil, order_by: nil, **_args| # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :buckets do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
     nbuckets = select_on['nbuckets'].to_i
     last_time = Time.parse(select_on['start_time'])
     end_time = Time.parse(select_on['end_time'])
@@ -101,7 +102,7 @@ class Pings < RPC
     min = nil
     max = nil
     count = sum = sum2 = 0
-    WIKK::SQL.connect(@config) do |sql|
+    WIKK::SQL.connect(@db_config) do |sql|
       sql.each_hash(query) do |row|
         (1..5).each do |t|
           v = row["time#{t}"].to_f
@@ -117,8 +118,11 @@ class Pings < RPC
           end
         end
       end
-      mean = sum / count.to_f
-      variance = (sum2 - sum * sum / count) / (count - 1)
+      max = 0 if max.nil?
+      min = 0 if min.nil?
+      mean = count <= 1 ? sum : sum / count.to_f
+      variance = count <= 1 ? 0 : (sum2 - sum * sum / count) / (count - 1)
+
       stddev = Math.sqrt(variance)
 
       # Limit the graph to 4 standard deviations, but bound that with max and min values.
