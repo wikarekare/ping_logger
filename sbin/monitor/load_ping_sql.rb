@@ -5,9 +5,7 @@
 CONF_FILE = "#{ARGV[0]}"
 
 require 'wikk_configuration'
-unless defined? WIKK_CONF
-  load '/wikk/etc/wikk.conf'
-end
+load '/wikk/etc/wikk.conf' unless defined? WIKK_CONF
 require_relative "#{RLIB}/monitor/ping_log.rb"
 
 @mysql_conf = WIKK::Configuration.new(MYSQL_CONF)

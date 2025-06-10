@@ -3,9 +3,7 @@ require 'cgi'
 require 'wikk_web_auth'
 require 'wikk_configuration'
 
-unless defined? WIKK_CONF
-  load '/wikk/etc/wikk.conf'
-end
+load '/wikk/etc/wikk.conf' unless defined? WIKK_CONF
 require "#{RLIB}/monitor/lastseen_sql.rb"
 require "#{RLIB}/monitor/ping_log.rb"
 require "#{RLIB}/monitor/signal_log_new.rb"

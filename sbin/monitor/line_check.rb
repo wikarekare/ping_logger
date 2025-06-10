@@ -7,9 +7,7 @@
 require 'time'
 require 'wikk_configuration'
 
-unless defined? WIKK_CONF
-  load '/wikk/etc/wikk.conf'
-end
+load '/wikk/etc/wikk.conf' unless defined? WIKK_CONF
 require_relative "#{RLIB}/monitor/lastseen_sql.rb"
 
 def load_current_line_state(timestamp:)

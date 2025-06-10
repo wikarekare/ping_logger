@@ -5,9 +5,7 @@ require 'snmp'
 require 'time'
 require 'wikk_configuration'
 
-unless defined? WIKK_CONF
-  load '/wikk/etc/wikk.conf'
-end
+load '/wikk/etc/wikk.conf' unless defined? WIKK_CONF
 require_relative "#{RLIB}/monitor/lastseen_sql.rb"
 require_relative "#{RLIB}/utility/snmp_override.rb"
 
