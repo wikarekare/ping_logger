@@ -12,12 +12,12 @@ class Pings < RPC
     @result_acl = [ 'hostname', 'rows', 'affected_rows', 'tz' ] # ignored for now.
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :create do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
     # new record
   end
 
   # Fetch ping logs for the host, between the given start and end times.
-  rmethod :read do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :read do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
     last_time = Time.parse(select_on['start_time'])
     end_time = Time.parse(select_on['end_time'])
     time_diff = end_time - last_time
@@ -71,18 +71,18 @@ class Pings < RPC
     return { 'rows' => [], 'affected_rows' => 0, 'hostname' => select_on['hostname'], 'tz' => tz }
   end
 
-  rmethod :update do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :update do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
     # We don't actually do this.
   end
 
-  rmethod :delete do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :delete do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
     # We don't actually do this.
   end
 
   # Fetch ping logs for the host, between the given start and end times.
   # Selecting on hostname with like, between start_time and end_time
   # Returning frequency in nbuckets.
-  rmethod :buckets do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument"
+  rmethod :buckets do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
     nbuckets = select_on['nbuckets'].to_i
     last_time = Time.parse(select_on['start_time'])
     end_time = Time.parse(select_on['end_time'])
