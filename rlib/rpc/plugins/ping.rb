@@ -6,13 +6,13 @@ require 'time'
 # Map db pinglog table
 class Pings < RPC
   def initialize(cgi:, authenticated: false)
-    super(cgi: cgi, authenticated: authenticated)
+    super
     @select_acl = [ 'hostname', 'start_time', 'end_time', 'tz' ]
     @set_acl = []
     @result_acl = [ 'hostname', 'rows', 'affected_rows', 'tz' ] # ignored for now.
   end
 
-  rmethod :create do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
+  rmethod :create do |select_on: nil, set: nil, result: nil, order_by: nil, **_args| # rubocop:disable Lint/UnusedBlockArgument
     # new record
   end
 
@@ -71,11 +71,11 @@ class Pings < RPC
     return { 'rows' => [], 'affected_rows' => 0, 'hostname' => select_on['hostname'], 'tz' => tz }
   end
 
-  rmethod :update do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
+  rmethod :update do |select_on: nil, set: nil, result: nil, order_by: nil, **_args| # rubocop:disable Lint/UnusedBlockArgument
     # We don't actually do this.
   end
 
-  rmethod :delete do |select_on: nil, set: nil, result: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
+  rmethod :delete do |select_on: nil, set: nil, result: nil, order_by: nil, **_args| # rubocop:disable Lint/UnusedBlockArgument
     # We don't actually do this.
   end
 
@@ -84,8 +84,8 @@ class Pings < RPC
   # Returning frequency in nbuckets.
   rmethod :buckets do |select_on: nil, set: nil, result: nil, order_by: nil, **args| # rubocop:disable Lint/UnusedBlockArgument
     nbuckets = select_on['nbuckets'].to_i
-    last_time = Time.parse(select_on['start_time'])
-    end_time = Time.parse(select_on['end_time'])
+    Time.parse(select_on['start_time'])
+    Time.parse(select_on['end_time'])
 
     # Need to check why a tz string with leading '+' has this replaced with a space
     tz = select_on['tz'].strip
@@ -128,7 +128,7 @@ class Pings < RPC
       # Limit the graph to 4 standard deviations, but bound that with max and min values.
       graph_min = mean - 4 * stddev
       graph_max = mean + 4 * stddev
-      buckets, bucket_labels = width_buckets(data: rows, min: graph_min > min ? graph_min : min, max: graph_max < max ? graph_max : max, nbuckets: nbuckets)
+      buckets, bucket_labels = width_buckets(data: rows, min: [ graph_min, min ].min, max: [ graph_max, max ].max, nbuckets: nbuckets)
       return { 'buckets' => buckets,
                'bucket_labels' => bucket_labels, # Midpoint value for the bucket range
                'nbuckets' => nbuckets,
