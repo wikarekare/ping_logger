@@ -115,7 +115,7 @@ class Ping_Log
           TmpFileMod::TmpFile.exec(GNUPLOT, temp_filename_plot )
         end
       end
-    rescue Exception => e # rubocop:disable Lint/RescueException
+    rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
       backtrace = e.backtrace[0].split(':')
       message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'').gsub("\n", ' ')}"
       return message

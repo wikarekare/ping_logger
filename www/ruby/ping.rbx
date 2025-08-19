@@ -100,7 +100,7 @@ auth_needed = @form_on || @connections =~ /[PC][0-9]*/
 begin
   pstore_conf = JSON.parse(File.read(PSTORE_CONF))
   @authenticated = WIKK::Web_Auth.authenticated?(@cgi, pstore_config: pstore_conf)
-rescue Exception => e # rubocop:disable Lint/RescueException
+rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
   @authenticated = false
 end
 
@@ -155,7 +155,7 @@ begin
   else
     @signal = []
   end
-rescue Exception => e # rubocop:disable Lint/RescueException
+rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
   backtrace = e.backtrace[0].split(':')
   message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
 end
@@ -357,7 +357,7 @@ if @no_traffic != 'true' || @traffic.length > 0
     else
       images = Graph_2D.new(@mysql_conf, @hosts[0], split_in_out, Time.at(start), Time.at(end_time) ).images
     end
-  rescue Exception => e # rubocop:disable Lint/RescueException
+  rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
     backtrace = e.backtrace[0].split(':')
     message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
   end
@@ -485,7 +485,7 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
             <input type="hidden" name="host" value="#{h}" id="host">
           HTML
         end
-      rescue Exception => e # rubocop:disable Lint/RescueException
+      rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
         backtrace = e.backtrace[0].split(':')
         message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
         host_list = ''
@@ -507,7 +507,7 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
             <input type="hidden" name="signal" value="#{h}" id="signal">
           HTML
         end
-      rescue Exception => e # rubocop:disable Lint/RescueException
+      rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
         backtrace = e.backtrace[0].split(':')
         message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
         signal_list = ''

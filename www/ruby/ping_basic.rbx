@@ -41,7 +41,7 @@ def cal_time_range
   elsif @start_date_time_str != nil && @start_date_time_str != ''
     begin
       @start_date_time = Time.parse(@start_date_time_str).to_i
-    rescue Exception => _e # rubocop:disable Lint/RescueException
+    rescue Exception => _e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
       @start_date_time = Time.now.to_i - (@days * 86400 + @hours * 3600).to_i
     end
   else # Default to last hour
@@ -73,7 +73,7 @@ def process_graph_list
     begin
       pstore_conf = JSON.parse(File.read(PSTORE_CONF))
       @authenticated = WIKK::Web_Auth.authenticated?(@cgi, pstore_config: pstore_conf)
-    rescue Exception => _e # rubocop:disable Lint/RescueException
+    rescue Exception => _e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
       @authenticated = false
     end
 
@@ -195,7 +195,7 @@ def gen_images
                        Graph_2D.new(@mysql_conf, h, true, Time.at(@start_date_time), Time.at(@end_time) ).images
                      end
         end
-      rescue Exception => e # rubocop:disable Lint/RescueException
+      rescue Exception => e # rubocop:disable Lint/RescueException -- We don't want cgi's crashing without producing output
         backtrace = e.backtrace[0].split(':')
         message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}\n"
         @message << message
