@@ -41,7 +41,7 @@ def cal_time_range
   elsif @start_date_time_str != nil && @start_date_time_str != ''
     begin
       @start_date_time = Time.parse(@start_date_time_str).to_i
-    rescue Exception => _e # rubocop:disable Lint/RescueException Ignore error and assume last hour
+    rescue Exception => _e # rubocop:disable Lint/RescueException
       @start_date_time = Time.now.to_i - (@days * 86400 + @hours * 3600).to_i
     end
   else # Default to last hour
@@ -187,25 +187,26 @@ def gen_images
           @images << Ping_Log.graph_clients(@mysql_conf, h, Time.at(@start_date_time), Time.at(@end_time) )
         when 'internal_hosts'
           @images << Graph_Internal_Hosts.new( h, Time.at(@start_date_time), Time.at(@end_time)).images
-        else # Assume traffic split
+        else # rubocop:disable Lint/DuplicateBranch
+          # Assume traffic split
           @images << if h == 'all'
                        Graph_2D.graph_border(@mysql_conf, true, Time.at(@start_date_time), Time.at(@end_time) )
                      else
                        Graph_2D.new(@mysql_conf, h, true, Time.at(@start_date_time), Time.at(@end_time) ).images
                      end
         end
-      rescue Exception => e
+      rescue Exception => e # rubocop:disable Lint/RescueException
         backtrace = e.backtrace[0].split(':')
-        message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}\n"
+        message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}\n"
         @message << message
       end
     end
   end
-  @images.collect! { |im| im.gsub(/\n/, '') }
+  @images.collect! { |im| im.gsub("\n", '') }
 end
 
 def quote_quotes(message)
-  message.gsub(/"/, '\"')
+  message.gsub('"', '\"')
 end
 
 @mysql_conf = WIKK::Configuration.new(MYSQL_CONF)
@@ -222,13 +223,16 @@ gen_images
 @message.collect! { |m| "\"#{quote_quotes(m)}\"" }
 
 @cgi.out('type' => 'application/json') do
-  "{ \"start_date_time\": \"#{Time.at(@start_date_time).to_sql}\",\n" +
-    "  \"end_time\": \"#{Time.at(@end_time)}\",\n" +
-    "  \"days\": #{@days},\n" +
-    "  \"hours\": #{@hours},\n" +
-    "  \"hosts\": [ #{@hosts.join(',')} ],\n" +
-    "  \"graph_type\": [ #{@graph_type.join(',')} ],\n" +
-    "  \"images\": [ #{@images.join(',')} ],\n" +
-    "  \"messages\": [ #{@message.join(',')} ],\n" +
-    "  \"result_code\": #{@message.length}\n}"
+  <<~JSON
+    { "start_date_time": "#{Time.at(@start_date_time).to_sql}",
+      "end_time": "#{Time.at(@end_time)}",
+      "days": #{@days},
+      "hours": #{@hours},
+      "hosts": [ #{@hosts.join(',')} ],
+      "graph_type": [ #{@graph_type.join(',')} ],
+      "images": [ #{@images.join(',')} ],
+      "messages": [ #{@message.join(',')} ],
+      "result_code": #{@message.length}
+    }
+  JSON
 end

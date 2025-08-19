@@ -18,9 +18,9 @@ end
 def fetch_host_list
   query = <<~SQL
     SELECT site_name FROM customer WHERE active = 1 UNION
-    SELECT CONCAT(site_name,\'-wifi\') AS site_name FROM backbone WHERE active=1 UNION
+    SELECT CONCAT(site_name,'-wifi') AS site_name FROM backbone WHERE active=1 UNION
     SELECT site_name FROM backbone WHERE active=1 UNION
-    SELECT CONCAT(site_name,\'-wifi\') AS site_name FROM distribution WHERE active=1  UNION
+    SELECT CONCAT(site_name,'-wifi') AS site_name FROM distribution WHERE active=1  UNION
     SELECT site_name FROM distribution WHERE active=1
     ORDER BY site_name
   SQL

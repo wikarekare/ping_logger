@@ -138,7 +138,7 @@ class Lastseen
     when :warning then 'orange'           # Beyond the ORANGE LIMIT for a host
     when :ok then 'green'                 # Within the JITTER LIMIT for a host
     when :unknown then 'black'            # Dont know the state of a host. No record in the DB. The host is new, or not in the fping hosts file.
-    else 'black'                          # rubocop:disable Lint/DuplicateBranch catch all. Shouldn't be possible.
+    else 'black'                          # rubocop:disable Lint/DuplicateBranch
     end
   end
 
@@ -193,7 +193,7 @@ class Lastseen
     state = {}
 
     # Get the state of every host.
-    @hosts.each do |key, _date|
+    @hosts.each_key do |key|
       state[key] = host_colour(key)
     end
 

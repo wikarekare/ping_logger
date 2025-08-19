@@ -80,7 +80,7 @@ class Ping_Log
               when 1   # 1 => t >, which can happen if there are two identical ping records!
                 # move to the next record, but us the same time (i.e. try to catch up)
                 i += 1 # move onto next record
-              when -1	#-1 => t < record datetime
+              when -1	# -1 => t < record datetime
                 # Stay on this record, but increment the time.
                 t += 60 # increment by a minute
               end
@@ -117,7 +117,7 @@ class Ping_Log
       end
     rescue Exception => e # rubocop:disable Lint/RescueException
       backtrace = e.backtrace[0].split(':')
-      message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'').gsub(/\n/, ' ')}"
+      message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'').gsub("\n", ' ')}"
       return message
     end
     return nil

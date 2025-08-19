@@ -26,7 +26,7 @@ class Host_Cluster
       SQL
       sql.each_hash(query) do |row|
         if @clusters[row['hostgroup'].capitalize].nil?
-          @clusters[row['hostgroup'].capitalize] = [ row['site_name']] # new cluster, so create within an array
+          @clusters[row['hostgroup'].capitalize] = [ row['site_name'] ] # new cluster, so create within an array
         elsif row[1] != nil
           @clusters[row['hostgroup'].capitalize] << row['site_name']
         end

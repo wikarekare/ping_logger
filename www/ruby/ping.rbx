@@ -93,9 +93,9 @@ end
 decode
 message = ''
 
-@form_on = (@form_state == 'on' || @form_state == 'true')
-auth_needed = ( @form_on || @connections =~ /[PC][0-9]*/ )
-@dist = ( @dist_b == 'true' || @dist == 'true')
+@form_on = @form_state == 'on' || @form_state == 'true'
+auth_needed = @form_on || @connections =~ /[PC][0-9]*/
+@dist = @dist_b == 'true' || @dist == 'true'
 
 begin
   pstore_conf = JSON.parse(File.read(PSTORE_CONF))
@@ -110,40 +110,28 @@ if auth_needed && !@authenticated
   @connections = 'D'
 end
 
-if @connections == 'C'
-  @graphtype = 'graphC'
-elsif @connections == 'C2'
-  @graphtype = 'graphC2'
-elsif @connections == 'C3'
-  @graphtype = 'graphC3'
-elsif @connections == 'P'
-  @graphtype = 'graphP'
-elsif @connections == 'P2'
-  @graphtype = 'graphP2'
-elsif @connections == 'P3'
-  @graphtype = 'graphP3'
-elsif @connections == 'T'
-  @graphtype = 'grapht'
-elsif @connections == 'D'
-  @graphtype = 'dualgraph'
-elsif @graphtype == '' && @this_graphtype != ''
-  @graphtype = @this_graphtype
-end
+@graphtype = case @connections
+             when 'C', 'C2', 'C3', 'P', 'P2', 'P3', 'T'
+               @graphtype = "graph#{@connections}"
+             when 'D'
+               'dualgraph'
+             else
+               if @graphtype == '' && @this_graphtype != ''
+                 @this_graphtype
+               else
+                 @graphtype
+               end
+             end
 
-if @graphtype == 'grapht'
-  split_in_out = true # actually doesn't matter, as it isn't looked at in this case.
-elsif @graphtype == 'dualgraph'
-  split_in_out = true
-elsif @graphtype == 'singlegraph'
-  split_in_out = false
-elsif @graphtype == 'graph3d'
-  split_in_out = false
-elsif @graphtype == 'graphC' || @graphtype == 'graphP' || @graphtype == 'graphP2' || @graphtype == 'graphP3' || @graphtype == 'graphC2' || @graphtype == 'graphC3'
-  split_in_out = false
-else
-  @graphtype = 'dualgraph'
-  split_in_out = true
-end
+split_in_out = case @graphtype
+               when 'graphT', 'dualgraph'
+                 true # actually doesn't matter, as it isn't looked at in this case.
+               when 'singlegraph', 'graph3d', 'graphC', 'graphP', 'graphP2', 'graphP3', 'graphC2', 'graphC3'
+                 false
+               else
+                 @graphtype = 'dualgraph'
+                 true
+               end
 
 if @hosts != nil && @hosts.length > 0
   # not sure why, but 0 length array causes silent exception in @cgi
@@ -169,10 +157,10 @@ begin
   end
 rescue Exception => e # rubocop:disable Lint/RescueException
   backtrace = e.backtrace[0].split(':')
-  message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
+  message = "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
 end
 
-if @graphtype == 'grapht' # is @graphtype grapht
+if @graphtype == 'graphT'
   @no_ping = 'true'
   if @this_month == ''
     st = (@start_date_time == '' ? Time.now.start_of_billing : Time.parse(@start_date_time ) )
@@ -238,7 +226,7 @@ else
             end
   elsif @start_date_time != ''
     start = Time.parse(@start_date_time ).to_i
-  else
+  else # rubocop: disable Lint/DuplicateBranch
     start = Time.now.to_i - (@hours * 60 * 60).to_i
   end
 
@@ -290,7 +278,7 @@ if @no_traffic != 'true' || @traffic.length > 0
     @hosts = @traffic
   end
   begin
-    if @graphtype == 'grapht'
+    if @graphtype == 'graphT'
       images = if @hosts[0] == '' || @hosts[0] == 'all'
                  Graph_Total_Usage.new(@mysql_conf, nil, Time.at(start), Time.at(end_time)).images
                else
@@ -316,7 +304,6 @@ if @no_traffic != 'true' || @traffic.length > 0
                 else
                   Graph_Ports.new(@hosts[0], Time.at(start), Time.at(end_time)).images
                 end
-      #
     elsif @graphtype == 'graphP2' # Port Hist
       images += if @hosts[0] =~ /wikk[0-9][0-9][0-9]/
                   Graph_Ports_Hist.new(@hosts[0] + '-net', Time.at(start), Time.at(end_time)).images
@@ -372,16 +359,92 @@ if @no_traffic != 'true' || @traffic.length > 0
     end
   rescue Exception => e # rubocop:disable Lint/RescueException
     backtrace = e.backtrace[0].split(':')
-    message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
+    message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
   end
   if @traffic.length > 0
     @hosts = @hold
   end
 end
 
+def error_response(script:)
+  <<~HTML
+    #{@cgi.head do
+        <<~HTML
+          #{@cgi.title { 'Ping Graph Error' }}
+          #{script}
+          <META HTTP-EQUIV="Pragma" CONTENT="no-cache"
+          <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+
+        HTML
+      end
+    }
+    #{@cgi.body { '<b>Error:</b> No host specified<p>' }}
+  HTML
+end
+
+def ping_form(on:, hidden:)
+  if on
+    <<~HTML
+      #{if @hosts[0] != ''
+          <<~HTML
+            Site <input type="text" name="host" value="#{@hosts[0]}" id="host" size="10">&nbsp;
+          HTML
+        end
+      }
+      Start of Interval <input type="text" name="start" value="#{Time.at(start).to_sql}" id="start">
+      Days <input type="text" name="days" value="#{@form_days}" id="days" size="5">
+      Hours <input type="text" name="hours" value="#{@form_hours}" id="hours" size="4">
+      <input type="submit" value="Submit" name="submit">&nbsp;&nbsp;
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      <BUTTON type="submit" value="C" name="connections"> Hosts </BUTTON>
+      <BUTTON type="submit" value="C3" name="connections"> Host Hist </BUTTON>
+      <BUTTON type="submit" value="P" name="connections"> Ports </BUTTON>
+      <BUTTON type="submit" value="P3" name="connections"> Port Hist </BUTTON>
+      <BUTTON type="submit" value="T" name="connections"> Usage </BUTTON>
+      <BUTTON type="submit" value="D" name="connections"> Dual </BUTTON>
+      <p>
+    HTML
+  elsif hidden
+    <<~HTML
+      #{if @hosts[0] != ''
+          <<~HTML
+            <b>#{@hosts[0]}</b>&nbsp;&nbsp;
+            <input type="hidden" name="host" value="#{@hosts[0]}" id="host" size="10">
+          HTML
+        end
+      }
+      <input type="hidden" name="start" value="#{Time.at(start).to_sql}">
+    HTML
+  else # Full form
+    <<~HTML
+      <div style="text-align: center; float:left;">
+      <input type="submit" value="<<" name="prevDay">
+      <input type="submit" value="Last Day" name="lastDay">
+      <input type="submit" value=">>" name="nextDay">
+      &nbsp;&nbsp;&nbsp;&nbsp;
+      <input type="submit" value="<<" name="prevHour">
+      <input type="submit" value="Last Hour" name="lastHour">
+      <input type="submit" value=">>" name="nextHour">
+      </div>
+      #{@start_date_time == '' ? '' : "<input type=\"hidden\" name=\"start\" value=\"#{@start_date_time}\">\n"}
+      #{if @form_hours == 1.0 && @form_days == 0.0
+          <<~HTML
+            #{@yesterday == '' ? '' : "<input type=\"hidden\" name=\"yesterday\" value=\"#{@yesterday}\">\n"}
+          HTML
+        else
+          <<~HTML
+            <input type="hidden" name="hours" value="#{@form_hours}" >
+            <input type="hidden" name="days" value="#{@form_days}">
+          HTML
+        end
+      }
+    HTML
+  end
+end
+
 @form_days = (@hours / 24).to_i
 @form_hours = @hours - (@form_days * 24)
-script = <<-EOF
+script = <<~HTML
   <script type="text/javascript">
     function correct_form_on(the_form)
     {
@@ -389,10 +452,14 @@ script = <<-EOF
       the_form.submit();
     }
   </script>
-EOF
+HTML
 
 @traffic_list = ''
-@traffic.each { |t| @traffic_list << "<input type=\"hidden\" name=\"traffic\" value=\"#{t}\" id=\"traffic\">\n" }
+@traffic.each do |t|
+  @traffic_list << <<~HTML
+    <input type="hidden" name="traffic" value="#{t}" id="traffic">
+  HTML
+end
 
 auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
 
@@ -400,158 +467,148 @@ auth_image = @authenticated ? '/images/unlocked.gif' : '/images/locked.gif'
 @cgi.out do
   @cgi.html do
     if @hosts.nil? || @hosts.length == 0
-      @cgi.head { @cgi.title { 'Ping Graph Error' } + "<META HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">\n" + '<META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">' } + script +
-        @cgi.body { '<b>Error:</b> No host specified<p>' }
+      error_response(script: script)
     else
-      @cgi.head do
-        @cgi.title { "#{@hosts.join(',')} Pings" } + script +
-          "<META HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">\n" +
-          '<META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">'
-      end +
-        @cgi.body do
-          begin
-            host_list = ''
-            @hosts.each do |h|
-              if @no_ping != 'true'
-                ping_record = Ping_Log.new(@mysql_conf)
-                if (error = ping_record.gnuplot(h, Time.at(start), Time.at(end_time)) ).nil?
-                  images << "<p><img src=\"/#{NETSTAT_DIR}/#{h}-p5f.png\"></p>\n"
-                end
-              end
-              host_list << "<input type=\"hidden\" name=\"host\" value=\"#{h}\" id=\"host\">\n"
+      # Create host list with images
+      begin
+        host_list = ''
+        @hosts.each do |h|
+          if @no_ping != 'true'
+            ping_record = Ping_Log.new(@mysql_conf)
+            if ping_record.gnuplot(h, Time.at(start), Time.at(end_time)).nil?
+              images << <<~HTML
+                <p><img src="/#{NETSTAT_DIR}/#{h}-p5f.png"></p>
+              HTML
             end
-          rescue Exception => e # rubocop:disable Lint/RescueException
-            backtrace = e.backtrace[0].split(':')
-            message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
-            host_list = ''
           end
-          begin
-            signal_list = ''
-            @signal.each do |h|
-              signal_record = Signal_Class.new(@mysql_conf)
-              if (error = signal_record.gnuplot(h, Time.at(start), Time.at(end_time)) ).nil?
-                images << "<p><img src=\"/#{NETSTAT_DIR}/#{h}-signal.png\"></p>\n"
-              else
-                message << error.to_s
-              end
-              signal_list << "<input type=\"hidden\" name=\"signal\" value=\"#{h}\" id=\"signal\">\n"
-            end
-          rescue Exception => e # rubocop:disable Lint/RescueException
-            backtrace = e.backtrace[0].split(':')
-            message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub(/'/, '\\\'')}"
-            signal_list = ''
-          end
-          "\n<!-- Graph failed with message: #{message}  -->\n" +
-            "<form name=\"traffic\" id=\"traffic\" method=\"get\" >\n" +
-            '<div style="text-align: right; FONT-FAMILY:Arial ; font-size: 10px; margin-top:0; margin-left:0;">' +
-            "<input type=\"hidden\" name=\"form_on\" value=\"#{@form_on == true ? 'on' : 'off'}\" id=\"form_on\">\n" +
-            "<a href=\"/ruby/login.rbx?#{@authenticated ? 'action=logout&' : ''}ReturnURL='#{CGI.escapeHTML(ENV.fetch('SCRIPT_NAME', nil) + encode)}'\"><img src=\"#{auth_image}\"/></a>" +
-            "<input type=\"image\" src=\"#{@form_on == true ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}\"  onclick=\"correct_form_on(this.form)\" />" +
-
-            # "<a href=\"/ruby/ping.rbx?host=#{@hosts[0]}#{@form_on == true ? "&form=off" : "&form=on" }#{@dist ? '&@dist=true' : ''}#{@graphtype == "" ? "" : "&@graphtype=#{@graphtype}"}\" >\n" +
-            # "<img  border=0 src=#{@form_on == true ? '/images/expandedTriangle.gif' : '/wikk_icons/blank.gif' }></a>" +
-            "#{Time.now}</div><br>\n" +
-            ( @dist ? "<input type=\"hidden\" name=\"dist\" value=\"true\" id=\"dist\">\n" : '' ) +
-            ( @link == 'true' ? "<input type=\"hidden\" name=\"link\" value=\"true\" id=\"link\">\n" : '' ) +
-            ( @no_ping == 'true' ? "<input type=\"hidden\" name=\"noping\" value=\"#{@no_ping}\" id=\"noping\">\n" : '' ) +
-            (@graphtype == '' ? '' : "<input type=\"hidden\" name=\"this_graphtype\" value=\"#{@graphtype}\">\n" ) +
-            (@no_traffic == 'true' ? "<input type=\"hidden\" name=\"no_traffic\" value=\"#{@no_traffic}\">\n" : '' ) +
-            if @graphtype == 'grapht'
-              "<div style=\"text-align: left; \">\n" +
-              if @form_on == true
-                if @hosts[0] == ''
-                  ''
-                else
-                  "Site <input type=\"text\" name=\"host\" value=\"#{@hosts[0]}\" id=\"host\" size=\"10\">&nbsp;\n"
-                end +
-                "Start of Interval <input type=\"text\" name=\"start\" value=\"#{Time.at(start).to_sql}\" id=\"start\">\n" +
-                "Days <input type=\"text\" name=\"days\" value=\"#{@form_days}\" id=\"days\" size=\"5\">" +
-                "Hours <input type=\"text\" name=\"hours\" value=\"#{@form_hours}\" id=\"hours\" size=\"4\">\n" +
-                "<input type=\"submit\" value=\"Submit\" name=\"submit\">&nbsp;&nbsp;\n" +
-                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\n" +
-                "<BUTTON type=\"submit\" value=\"C\" name=\"connections\"> Hosts </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"C3\" name=\"connections\"> Host Hist </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"P\" name=\"connections\"> Ports </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"P3\" name=\"connections\"> Port Hist </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"T\" name=\"connections\"> Usage </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"D\" name=\"connections\"> Dual </BUTTON>\n" +
-                "<p>\n"
-              else
-                if @hosts[0] == ''
-                  ''
-                else
-                  "<b>#{@hosts[0]}</b>&nbsp;&nbsp;\n" +
-                  "<input type=\"hidden\" name=\"host\" value=\"#{@hosts[0]}\" id=\"host\" size=\"10\">\n"
-                end +
-                "<input type=\"hidden\" name=\"start\" value=\"#{Time.at(start).to_sql}\">\n"
-              end +
-              "<input type=\"submit\" value=\"<<\" name=\"prevMonth\"> \n" +
-              "<input type=\"submit\" value=\"This Month\" name=\"thisMonth\">\n" +
-              "<input type=\"submit\" value=\">>\" name=\"nextMonth\"> \n" +
-              "</div>\n"
-            else
-              @traffic_list +
-              host_list +
-              signal_list +
-              if @form_on == true
-                "<div style=\"text-align: left; \">\n" +
-                "Start Date-time <input type=\"text\" name=\"start\" value=\"#{Time.at(start).to_sql}\" id=\"start\">\n" +
-                "Days <input type=\"text\" name=\"days\" value=\"#{@form_days}\" id=\"days\" size=\"5\">" +
-                "Hours <input type=\"text\" name=\"hours\" value=\"#{@form_hours}\" id=\"hours\" size=\"4\">\n" +
-                "<input type=\"submit\" value=\"Submit\" name=\"submit\">\n" +
-                "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\n" +
-                "<BUTTON type=\"submit\" value=\"C\" name=\"connections\"> Hosts </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"C3\" name=\"connections\"> Host Hist </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"P\" name=\"connections\"> Ports </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"P3\" name=\"connections\"> Port Hist </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"T\" name=\"connections\"> Usage </BUTTON>\n" +
-                "<BUTTON type=\"submit\" value=\"D\" name=\"connections\"> Dual </BUTTON>\n" +
-                '<p>' +
-                "<input type=\"submit\" value=\"Last Seen\" name=\"lastseen\"> \n" +
-                "<input type=\"submit\" value=\"<<\" name=\"prev\"> \n" +
-                "<input type=\"submit\" value=\"Last Period\" name=\"endnow\">\n" +
-                "<input type=\"submit\" value=\">>\" name=\"next\"> \n" +
-                "</div>\n"
-              else
-                "<div style=\"text-align: center; float:left;\">\n" +
-                "<input type=\"submit\" value=\"<<\" name=\"prevDay\"> \n" +
-                "<input type=\"submit\" value=\"Last Day\" name=\"lastDay\"> \n" +
-                "<input type=\"submit\" value=\">>\" name=\"nextDay\"> \n" +
-                '&nbsp;&nbsp;&nbsp;&nbsp;' +
-                "<input type=\"submit\" value=\"<<\" name=\"prevHour\"> \n" +
-                "<input type=\"submit\" value=\"Last Hour\" name=\"lastHour\"> \n" +
-                "<input type=\"submit\" value=\">>\" name=\"nextHour\"> \n" +
-                "</div>\n" +
-                (@start_date_time == '' ? '' : "<input type=\"hidden\" name=\"start\" value=\"#{@start_date_time}\">\n" ) +
-                if @form_hours == 1.0 && @form_days == 0.0
-                  (@yesterday == '' ? '' : "<input type=\"hidden\" name=\"yesterday\" value=\"#{@yesterday}\">\n" )
-                else
-                  "<input type=\"hidden\" name=\"hours\" value=\"#{@form_hours}\" >" +
-                  "<input type=\"hidden\" name=\"days\" value=\"#{@form_days}\">\n"
-                end
-              end
-            end +
-            "\n" +
-            "<div style=\"text-align: right; float:right;\">\n" +
-            if @graphtype == 'grapht'
-              ''
-            elsif @graphtype == 'graph3d'
-              "    <BUTTON type=\"submit\" value=\"dualgraph\" name=\"graphtype\"><img src=\"/images/dualgraph.gif\"></BUTTON>\n" +
-              "    <BUTTON type=\"submit\" value=\"singlegraph\" name=\"graphtype\"><img src=\"/images/singlegraph.gif\"></BUTTON>\n"
-            elsif @graphtype == 'singlegraph'
-              "    <BUTTON type=\"submit\" value=\"#{@dist ? 'false' : 'true'}\" name=\"dist_b\"><img src=\"#{@dist ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}\"></BUTTON>\n" +
-              "    <BUTTON type=\"submit\" value=\"graph3d\" name=\"graphtype\"><img src=\"/images/graph3d.gif\"></BUTTON>\n" +
-              "    <BUTTON type=\"submit\" value=\"dualgraph\" name=\"graphtype\"><img src=\"/images/dualgraph.gif\"></BUTTON>\n"
-            else # dual graph
-              "    <BUTTON type=\"submit\" value=\"#{@dist ? 'false' : 'true'}\" name=\"dist_b\"><img src=\"#{@dist ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}\"></BUTTON>\n" +
-              ( @link == 'true' ? "<input type=\"hidden\" name=\"link\" value=\"true\" id=\"link\">\n" : '' ) +
-              "    <BUTTON type=\"submit\" value=\"graph3d\" name=\"graphtype\"><img src=\"/images/graph3d.gif\"></BUTTON>\n" +
-              "    <BUTTON type=\"submit\" value=\"singlegraph\" name=\"graphtype\"><img src=\"/images/singlegraph.gif\"></BUTTON>\n"
-            end +
-            "</div><br>\n" +
-            '</p>' +
-            "</form>\n" + format_images(images)
+          host_list << <<~HTML
+            <input type="hidden" name="host" value="#{h}" id="host">
+          HTML
         end
+      rescue Exception => e # rubocop:disable Lint/RescueException
+        backtrace = e.backtrace[0].split(':')
+        message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
+        host_list = ''
+      end
+
+      # Create signal list with images
+      begin
+        signal_list = ''
+        @signal.each do |h|
+          signal_record = Signal_Class.new(@mysql_conf)
+          if (error = signal_record.gnuplot(h, Time.at(start), Time.at(end_time)) ).nil?
+            images << <<~HTML
+              <p><img src="/#{NETSTAT_DIR}/#{h}-signal.png"></p>
+            HTML
+          else
+            message << error.to_s
+          end
+          signal_list << <<~HTML
+            <input type="hidden" name="signal" value="#{h}" id="signal">
+          HTML
+        end
+      rescue Exception => e # rubocop:disable Lint/RescueException
+        backtrace = e.backtrace[0].split(':')
+        message << "MSG: (#{File.basename(backtrace[-3])} #{backtrace[-2]}): #{e.message.to_s.gsub('\'', '\\\'')}"
+        signal_list = ''
+      end
+
+      # HTML response
+      <<~HTML
+        #{@cgi.head do
+            <<~HTML
+              #{@cgi.title { "#{@hosts.join(',')} Pings" }}
+              #{script}
+              <META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+              <META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
+
+            HTML
+          end
+        }
+
+        #{@cgi.body do
+            <<~HTML
+              <!-- Graph failed with message: #{message}  -->
+              <form name="traffic" id="traffic" method="get" >
+              <div style="text-align: right; FONT-FAMILY:Arial ; font-size: 10px; margin-top:0; margin-left:0;">
+              <input type="hidden" name="form_on" value="#{@form_on == true ? 'on' : 'off'}" id="form_on">
+              <a href="/ruby/login.rbx?#{@authenticated ? 'action=logout&' : ''}ReturnURL='#{CGI.escapeHTML(ENV.fetch('SCRIPT_NAME', nil) + encode)}'"><img src="#{auth_image}"/></a>
+              <input type="image" src="#{@form_on == true ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}"  onclick="correct_form_on(this.form)" />
+              #{Time.now}</div><br>
+              #{ <<~HTML if @dist
+                <input type="hidden" name="dist" value="true" id="dist">
+              HTML
+              }
+              #{<<~HTML if @link == 'true'
+                <input type="hidden" name="link" value="true" id="link">
+              HTML
+              }
+              #{<<~HTML if @no_ping == 'true'
+                <input type="hidden" name="noping" value="#{@no_ping}" id="noping">
+              HTML
+              }
+              #{<<~HTML if @graphtype == ''
+                <input type="hidden" name="this_graphtype" value="#{@graphtype}">
+              HTML
+              }
+              #{<<~HTML if @no_traffic == 'true'
+                <input type="hidden" name="no_traffic" value="#{@no_traffic}">
+              HTML
+              }
+              #{if @graphtype == 'graphT'
+                  <<~HTML
+                    <div style="text-align: left; ">
+                      #{ping_form(on: form_on, hidden: true)}
+                      <input type="submit" value="<<" name="prevMonth">
+                      <input type="submit" value="This Month" name="thisMonth">
+                      <input type="submit" value=">>" name="nextMonth">
+                    </div>
+                  HTML
+                else
+                  <<~HTML
+                    #{@traffic_list}
+                    #{host_list}
+                    #{signal_list}
+                    #{ping_form(on: form_on, hidden: false)}
+                  HTML
+                end
+              }
+
+              <div style="text-align: right; float:right;">
+                #{case @graphtype
+                  when 'graphT'
+                    break
+                  when 'graph3d'
+                    <<~HTML
+                      <BUTTON type="submit" value="dualgraph" name="graphtype"><img src="/images/dualgraph.gif"></BUTTON>
+                      <BUTTON type="submit" value="singlegraph" name="graphtype"><img src="/images/singlegraph.gif"></BUTTON>
+                    HTML
+                  when 'singlegraph'
+                    <<~HTML
+                      <BUTTON type="submit" value="#{@dist ? 'false' : 'true'}" name="dist_b"><img src="#{@dist ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}"></BUTTON>
+                      <BUTTON type="submit" value="graph3d" name="graphtype"><img src="/images/graph3d.gif"></BUTTON>
+                      <BUTTON type="submit" value="dualgraph" name="graphtype"><img src="/images/dualgraph.gif"></BUTTON>
+                    HTML
+                  else # dual graph
+                    <<~HTML
+                      <BUTTON type="submit" value="#{@dist ? 'false' : 'true'}" name="dist_b"><img src="#{@dist ? '/images/expandedTriangle.gif' : '/images/closedTriangle.gif'}"></BUTTON>
+                      #{<<~HTML if @link == 'true'
+                        <input type="hidden" name="link" value="true" id="link">
+                      HTML
+                      }
+                      <BUTTON type="submit" value="graph3d" name="graphtype"><img src="/images/graph3d.gif"></BUTTON>
+                      <BUTTON type="submit" value="singlegraph" name="graphtype"><img src="/images/singlegraph.gif"></BUTTON>
+                    HTML
+                  end
+                }
+              </div><br>
+              </p>
+              </form>
+              #{format_images(images)}
+            HTML
+          end
+        }
+      HTML
     end
   end
 end
